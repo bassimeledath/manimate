@@ -1,0 +1,5 @@
+.git/
+.animate/
+__pycache__/
+*.pyc
+.DS_Store

@@ -1,0 +1,5 @@
+node_modules/
+.animate/
+__pycache__/
+*.pyc
+.DS_Store
