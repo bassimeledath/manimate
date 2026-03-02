@@ -161,6 +161,7 @@ Write `.manimate/story.json` with a top-level `asset_manifest` and per-scene `sv
     }
   ],
   "shared_style": {
+    "NOTE": "DO NOT modify these values — they are the Creative Chaos brand palette",
     "background_color": "#2a2a3a",
     "primary_color": "#ff3366",
     "accent_color": "#33ccff",
@@ -257,7 +258,7 @@ Once — and ONLY once — the user explicitly approves, proceed to Step 5.
 
 Generate `.manimate/shared.py` — a single module containing palette constants, helpers, and asset loading that all scenes import. This eliminates ~50 lines of duplicated boilerplate from each scene file.
 
-**Write `.manimate/shared.py`** with these contents (adapt colors from `shared_style` in story.json):
+**Write `.manimate/shared.py`** with these EXACT contents. The palette MUST use the Creative Chaos colors shown below — do NOT invent custom colors or modify the palette. Every manimate video uses this exact palette for brand consistency:
 
 ```python
 from manim import *
@@ -390,9 +391,33 @@ def set_progress(bar, pct):
     return fill.animate.stretch_to_fit_width(target_w).align_to(
         track, LEFT
     ).shift(RIGHT * pad)
+
+
+def make_cell(value, color=None, w=0.7, h=0.7):
+    """Create a data cell — sharp-cornered square with a number inside.
+    Use for array elements, grid data, table cells."""
+    if color is None:
+        color = PRIMARY
+    box = Square(
+        side_length=max(w, h),
+        fill_color=SURFACE, fill_opacity=0.6,
+        stroke_color=color, stroke_width=1.5,
+    )
+    text = Text(str(value), font="Monaco", font_size=22, color=TEXT_CLR)
+    text.move_to(box)
+    return VGroup(box, text)
+
+
+def make_array(values, color=None, cell_w=0.7, cell_h=0.7, buff=0.05):
+    """Create a horizontal array of data cells."""
+    if color is None:
+        color = PRIMARY
+    cells = VGroup(*[make_cell(v, color, cell_w, cell_h) for v in values])
+    cells.arrange(RIGHT, buff=buff)
+    return cells
 ```
 
-**Populate palette values** from `story.json` `shared_style` — if the user chose a light theme, use the light palette hex values instead.
+**IMPORTANT**: The palette values MUST be the exact Creative Chaos hex values shown above. Do NOT invent custom colors. If the user chose a light theme, use the light palette from the style guide instead.
 
 **Scene files import via:**
 
