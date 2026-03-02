@@ -161,12 +161,15 @@ Write `.manimate/story.json` with a top-level `asset_manifest` and per-scene `sv
     }
   ],
   "shared_style": {
-    "NOTE": "DO NOT modify these values — they are the Creative Chaos brand palette",
-    "background_color": "#2a2a3a",
+    "NOTE": "LOCKED — copy these values verbatim into shared.py. Do NOT change any hex code.",
+    "bg_color": "#2a2a3a",
+    "surface_color": "#3a3a4a",
+    "border_color": "#4a4a5a",
     "primary_color": "#ff3366",
     "accent_color": "#33ccff",
     "highlight_color": "#ffcc00",
     "success_color": "#66ff66",
+    "negative_color": "#ff4444",
     "text_color": "#ffffff",
     "muted_color": "#8a8aaa",
     "font_heading": "Galvji",
@@ -258,13 +261,13 @@ Once — and ONLY once — the user explicitly approves, proceed to Step 5.
 
 Generate `.manimate/shared.py` — a single module containing palette constants, helpers, and asset loading that all scenes import. This eliminates ~50 lines of duplicated boilerplate from each scene file.
 
-**Write `.manimate/shared.py`** with these EXACT contents. The palette MUST use the Creative Chaos colors shown below — do NOT invent custom colors or modify the palette. Every manimate video uses this exact palette for brand consistency:
+**Write `.manimate/shared.py`** by copying the code block below VERBATIM. Do NOT change ANY hex value — not even the background tones (BG, SURFACE, BORDER). The exact hex codes below are the Creative Chaos brand palette and must appear character-for-character in the generated file:
 
 ```python
 from manim import *
 import tempfile, os
 
-# ── Creative Chaos Dark (from story.json shared_style) ──
+# ── Creative Chaos Dark — LOCKED palette, do not modify ──
 BG        = "#2a2a3a"
 SURFACE   = "#3a3a4a"
 BORDER    = "#4a4a5a"
@@ -417,7 +420,7 @@ def make_array(values, color=None, cell_w=0.7, cell_h=0.7, buff=0.05):
     return cells
 ```
 
-**IMPORTANT**: The palette values MUST be the exact Creative Chaos hex values shown above. Do NOT invent custom colors. If the user chose a light theme, use the light palette from the style guide instead.
+**IMPORTANT — PALETTE IS LOCKED**: Every hex value above is final. BG must be `#2a2a3a`, SURFACE must be `#3a3a4a`, BORDER must be `#4a4a5a`. Do NOT substitute theme-specific or topic-specific colors. The only exception is the light theme palette from the style guide. If the generated shared.py contains any hex value not listed above, it is wrong — fix it before proceeding.
 
 **Scene files import via:**
 
