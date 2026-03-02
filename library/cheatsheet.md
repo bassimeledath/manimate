@@ -78,12 +78,13 @@ SPECIAL:   GOLD, MAROON, DARK_BROWN, LIGHT_BROWN
 ## SVG Icons (custom visuals — KEY differentiator)
 For real-world concepts (servers, databases, users, locks, etc.), generate custom SVGs instead of using basic shapes. This is what makes manimate videos look professional.
 
-### Primary Pattern: load_asset()
-Pre-validated SVGs live in `.manimate/assets/`. Load them by ID:
+### Primary Pattern: load_asset() (generated in Step 6, loaded in Step 8)
+Step 6 generates SVG files to `.manimate/assets/`. Scene code loads them by ID:
 ```python
-icon = load_asset("server_icon", scale=0.8)      # from .manimate/assets/server_icon.svg
+icon = load_asset("terminal_icon", scale=0.8)     # loads .manimate/assets/terminal_icon.svg
 db   = load_asset("database_icon", scale=0.8)
 ```
+The asset IDs come from `asset_manifest` in story.json — do NOT hardcode icon names from templates.
 
 ### Fallback: svg_icon() for rare one-off SVGs (under 5 lines)
 ```python
@@ -111,10 +112,10 @@ icon.submobjects[0].set_fill(PRIMARY)                 # Recolor first element
 ### Hybrid Layouts: SVG + Native Shapes
 ```python
 # SVG icons alongside Manim arrows and text
-user = svg_icon(SVG_USER, scale=0.8).move_to(LEFT * 3)
-server = svg_icon(SVG_SERVER, scale=0.8).move_to(RIGHT * 3)
+user = load_asset("user_icon", scale=0.8).move_to(LEFT * 3)
+server = load_asset("server_icon", scale=0.8).move_to(RIGHT * 3)
 arrow = Arrow(user.get_right(), server.get_left(), color=BORDER, buff=0.3)
 label = Text("request", font_size=20, color=TEXT_CLR).next_to(arrow, UP, buff=0.15)
 ```
 
-Generate SVGs at runtime following the SVG Icon Style Rules in the style guide. LLMs produce great SVGs — just follow the palette, stroke, and flat-design constraints.
+SVG assets are generated in Step 6 following the SVG Icon Style Rules in the style guide, then loaded in scene code via `load_asset()`.

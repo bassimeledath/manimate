@@ -239,13 +239,17 @@ Does this outline look good? You can:
   3. Change output format (mp4 / gif / both)
 ```
 
+**⛔ HARD STOP — Do NOT proceed past this point until the user explicitly approves.**
+
+After presenting the outline, STOP. Do not generate any code, write any files, or start any subsequent steps. Wait for the user to respond. This is a mandatory approval gate.
+
 **Revision loop:**
 
 - If the user requests changes, update `.manimate/story.json` accordingly (add/remove scenes, edit descriptions, adjust durations, etc.) and re-present the outline.
 - If the user changes the output format, update `.manimate/params.json` (`format` field) and `.manimate/manim.cfg` to match.
-- Repeat until the user explicitly approves.
+- Repeat until the user explicitly approves (e.g., "looks good", "approved", "go ahead", "yes").
 
-Once approved, proceed to Step 5.
+Once — and ONLY once — the user explicitly approves, proceed to Step 5.
 
 ---
 
