@@ -17,7 +17,7 @@ Generate diagram and animation videos from natural language descriptions using M
 
 ## Pipeline
 
-When the user invokes `/manimate`, execute these steps in order (Steps 1-7 are the core pipeline; Step 8 is an optional visual validation offered after the report):
+When the user invokes `/manimate`, execute these steps in order (Steps 1-8 are the core pipeline; Step 9 is an optional visual validation offered after the report):
 
 ---
 
@@ -204,7 +204,51 @@ Workers will generate the actual SVG strings inline based on these asset names â
 
 ---
 
-### Step 4: Scene Generation (Sequential)
+### Step 4: Outline Confirmation
+
+Before generating any scene code, present the story outline to the user for review and approval.
+
+**Build a readable summary from `.manimate/story.json`:**
+
+```
+Scene Outline for: "{title}"
+
+  Scene 1: {scene_title}
+    {description}
+    Key visuals: {visual_elements joined as comma-separated list}
+    Duration: {duration}s
+
+  Scene 2: {scene_title}
+    {description}
+    Key visuals: {visual_elements joined as comma-separated list}
+    Duration: {duration}s
+
+  ...
+
+Total duration: {sum of all durations}s
+Output format: MP4 (default). Would you like GIF, or both?
+```
+
+**Present this outline to the user and ask:**
+
+```
+Does this outline look good? You can:
+  1. Approve and continue
+  2. Request changes (add/remove/reorder scenes, adjust descriptions, change durations)
+  3. Change output format (mp4 / gif / both)
+```
+
+**Revision loop:**
+
+- If the user requests changes, update `.manimate/story.json` accordingly (add/remove scenes, edit descriptions, adjust durations, etc.) and re-present the outline.
+- If the user changes the output format, update `.manimate/params.json` (`format` field) and `.manimate/manim.cfg` to match.
+- Repeat until the user explicitly approves.
+
+Once approved, proceed to Step 5.
+
+---
+
+### Step 5: Scene Generation (Sequential)
 
 For each scene, spawn a worker using the agent CLI. Workers run **sequentially** in V1.
 
@@ -429,7 +473,7 @@ print('$FILE defines $SCENE_CLASS')
 
 ---
 
-### Step 5: Render & Error Recovery
+### Step 6: Render & Error Recovery
 
 For each scene, render with Manim. If rendering fails, feed the error back to a fix worker.
 
@@ -545,7 +589,7 @@ done
 
 ---
 
-### Step 6: Stitch & Convert
+### Step 7: Stitch & Convert
 
 Run the render script to concatenate scene videos and convert to GIF:
 
@@ -560,7 +604,7 @@ bash "$SKILL_DIR/scripts/render.sh" \
 
 ---
 
-### Step 7: Report
+### Step 8: Report
 
 ```
 Animation complete!
@@ -579,7 +623,7 @@ Output:
 
 ---
 
-### Step 8: Visual Validation (Optional)
+### Step 9: Visual Validation (Optional)
 
 After reporting, ask the user:
 
@@ -625,7 +669,7 @@ If any scenes fail, ask:
 Scene(s) 2 failed validation. Would you like to regenerate the failed scene(s)?
 ```
 
-If the user accepts, re-run Steps 4-5 for the failed scenes only, then re-stitch in Step 6 and re-validate.
+If the user accepts, re-run Steps 5-6 for the failed scenes only, then re-stitch in Step 7 and re-validate.
 
 > **Note**: This step uses only the agent's built-in image reading capability â€” no external dependencies required.
 
