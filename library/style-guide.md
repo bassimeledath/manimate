@@ -152,8 +152,8 @@ Titles get a thin PRIMARY-colored underline that grows from center. This is the 
 # Title with signature underline
 title = Text("Scene Title", font="Galvji", font_size=44, color=TEXT_CLR, weight=BOLD)
 underline = Line(
-    title.get_left() + DOWN * 0.2,
-    title.get_right() + DOWN * 0.2,
+    title.get_left() + DOWN * 0.35,
+    title.get_right() + DOWN * 0.35,
     color=PRIMARY, stroke_width=2.5,
 )
 
@@ -171,6 +171,51 @@ self.play(
     FadeOut(underline, run_time=0.3),
     run_time=0.5,
 )
+```
+
+### Reusable Title Card Helper
+
+Copy this function into any scene to get the standard title card pattern — bounce in, display, move to corner. This ensures consistent underline positioning.
+
+```python
+def title_card(scene, text, wait=1.5):
+    """Show title with signature underline, then move to corner.
+
+    Args:
+        scene: the Scene instance (pass `self` from construct)
+        text: the title string
+        wait: seconds to display before moving to corner (default 1.5)
+    Returns:
+        title Mobject (now in the UL corner at scale 0.55)
+    """
+    title = Text(text, font="Galvji", font_size=44, color=TEXT_CLR, weight=BOLD)
+    underline = Line(
+        title.get_left() + DOWN * 0.35,
+        title.get_right() + DOWN * 0.35,
+        color=PRIMARY, stroke_width=2.5,
+    )
+    scene.play(
+        FadeIn(title, shift=UP * 0.4),
+        GrowFromCenter(underline),
+        run_time=0.7,
+    )
+    scene.wait(wait)
+    scene.play(
+        title.animate.scale(0.55).to_corner(UL, buff=0.5),
+        FadeOut(underline, run_time=0.3),
+        run_time=0.5,
+    )
+    return title
+```
+
+Usage in a scene:
+```python
+class MyScene(Scene):
+    def construct(self):
+        self.camera.background_color = BG
+        # ... dot grid setup ...
+        title = title_card(self, "My Scene Title")
+        # title is now in the UL corner — continue with main content
 ```
 
 ---
@@ -478,11 +523,11 @@ class SceneName(Scene):
         ])
         self.add(dots)
 
-        # 2. Title card with underline
+        # 2. Title card with underline (use title_card() helper for new scenes)
         title = Text("Title Here", font="Galvji", font_size=44, color=TEXT_CLR, weight=BOLD)
         underline = Line(
-            title.get_left() + DOWN * 0.2,
-            title.get_right() + DOWN * 0.2,
+            title.get_left() + DOWN * 0.35,
+            title.get_right() + DOWN * 0.35,
             color=PRIMARY, stroke_width=2.5,
         )
         self.play(
@@ -539,14 +584,14 @@ class TitleCard(Scene):
         ])
         self.add(dots)
 
-        # Title with signature underline
+        # Title with signature underline (or use title_card() helper)
         title = Text(
             "Binary Search", font="Galvji", font_size=44,
             color=TEXT_CLR, weight=BOLD,
         )
         underline = Line(
-            title.get_left() + DOWN * 0.2,
-            title.get_right() + DOWN * 0.2,
+            title.get_left() + DOWN * 0.35,
+            title.get_right() + DOWN * 0.35,
             color=PRIMARY, stroke_width=2.5,
         )
         self.play(

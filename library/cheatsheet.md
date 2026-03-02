@@ -130,4 +130,4 @@ arrow = Arrow(user.get_right(), server.get_left(), color=BORDER, buff=0.3)
 label = Text("request", font_size=20, color=TEXT_DIM).next_to(arrow, UP, buff=0.15)
 ```
 
-See `library/svg-icons.md` for the full icon catalog with 20+ ready-to-adapt templates.
+Generate SVGs at runtime following the SVG Icon Style Rules in the style guide. LLMs produce great SVGs — just follow the palette, stroke, and flat-design constraints.

@@ -49,8 +49,8 @@ class BasicScene(Scene):
         # 2. Title card with signature underline
         title = Text("Scene Title", font="Galvji", font_size=44, color=TEXT_CLR, weight=BOLD)
         underline = Line(
-            title.get_left() + DOWN * 0.2,
-            title.get_right() + DOWN * 0.2,
+            title.get_left() + DOWN * 0.35,
+            title.get_right() + DOWN * 0.35,
             color=PRIMARY, stroke_width=2.5,
         )
         self.play(

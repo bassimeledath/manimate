@@ -259,7 +259,6 @@ For each scene, spawn a worker using the agent CLI. Workers run **sequentially**
 | Scene template | Always injected | Conditionally injected |
 |---------------|-----------------|----------------------|
 | All types | `cheatsheet.md`, `style-guide.md`, `common-errors.md` | — |
-| All types (if scene has `svg_assets`) | `svg-icons.md` | — |
 | `basic` | — | `animations.md` |
 | `math` | — | `text-and-math.md`, `animations.md` |
 | `graph` | — | `animations.md` |
@@ -276,19 +275,6 @@ SKILL_DIR="$(dirname "$(readlink -f "$0")" 2>/dev/null || cd "$(dirname "$0")" &
 CHEATSHEET="$(cat "$SKILL_DIR/library/cheatsheet.md")"
 STYLE_GUIDE="$(cat "$SKILL_DIR/library/style-guide.md")"
 COMMON_ERRORS="$(cat "$SKILL_DIR/library/common-errors.md")"
-
-# SVG icons reference — injected when scene has svg_assets
-HAS_SVG_ASSETS=$(python3 -c "
-import json
-story = json.load(open('.manimate/story.json'))
-assets = story['scenes'][$((N-1))].get('svg_assets', [])
-print('yes' if assets else 'no')
-")
-SVG_ICONS_REF=""
-if [ "$HAS_SVG_ASSETS" = "yes" ]; then
-  SVG_ICONS_REF="### SVG Icons Reference
-$(cat "$SKILL_DIR/library/svg-icons.md")"
-fi
 
 # Read scene metadata
 SCENE_TEMPLATE_NAME=$(python3 -c "
@@ -376,8 +362,6 @@ $STYLE_GUIDE
 
 $EXTRA_REFS
 
-$SVG_ICONS_REF
-
 ### Common Errors to Avoid
 $COMMON_ERRORS
 
@@ -394,8 +378,8 @@ $COMMON_ERRORS
 9. Use .animate syntax for simple property changes
 10. Use Transform/ReplacementTransform for morphing between objects
 $LATEX_RULE
-12. For real-world concepts (servers, databases, users, documents, locks, etc.), generate a custom SVG icon instead of using a basic rectangle or circle. Use the svg_icon() helper and follow SVG rules from the reference docs. SVGs must use flat colors only — NO gradients, NO filters, NO <text> elements, NO stroke-dasharray. Use Manim Text() for all labels.
-13. Define SVG strings as Python string constants at the top of the scene, write them via the svg_icon() helper. Keep SVGs simple with viewBox="0 0 80 100" or similar. Use colors from the shared_style palette.
+12. For real-world concepts (servers, databases, users, documents, locks, etc.), generate a custom SVG icon at runtime instead of using a basic rectangle or circle. Use the svg_icon() helper and follow the SVG Icon Style Rules in the style guide. SVGs must use flat colors only — NO gradients, NO filters, NO <text> elements, NO stroke-dasharray. Use Manim Text() for all labels.
+13. Define SVG strings as Python string constants at the top of the scene, write them via the svg_icon() helper. Keep SVGs simple with viewBox="0 0 80 100" or similar. Use colors from the shared_style palette. LLMs generate great SVGs — no catalog needed, just follow the style guide rules.
 
 ## Text Pacing Rules (CRITICAL — text must be readable)
 
@@ -682,8 +666,7 @@ When generating scenes, the dispatcher reads these files and injects their conte
 | File | Purpose | Used by |
 |------|---------|---------|
 | `library/cheatsheet.md` | Manim API quick reference | All scene types |
-| `library/style-guide.md` | Color palette, font sizes, timing | All scene types |
-| `library/svg-icons.md` | SVG icon catalog, helper function, design rules | Scenes with `svg_assets` |
+| `library/style-guide.md` | Color palette, font sizes, timing, SVG style rules | All scene types |
 | `library/animations.md` | Animation patterns with code | basic, math, graph |
 | `library/text-and-math.md` | Text, MathTex, Code patterns | math, code |
 | `library/common-errors.md` | Known pitfalls and fixes | All scene types |
