@@ -422,6 +422,8 @@ def make_array(values, color=None, cell_w=0.7, cell_h=0.7, buff=0.05):
 
 **IMPORTANT — PALETTE IS LOCKED**: Every hex value above is final. BG must be `#2a2a3a`, SURFACE must be `#3a3a4a`, BORDER must be `#4a4a5a`. Do NOT substitute theme-specific or topic-specific colors. The only exception is the light theme palette from the style guide. If the generated shared.py contains any hex value not listed above, it is wrong — fix it before proceeding.
 
+**Semantic aliases are allowed**: After the palette block, you may add project-specific aliases that map to palette tokens (e.g., `US_COLOR = ACCENT`, `SENDER_COLOR = PRIMARY`). These improve scene code readability without introducing custom hex values. Never assign a raw hex code to an alias.
+
 **Scene files import via:**
 
 ```python
