@@ -227,8 +227,14 @@ Scene Outline for: "{title}"
   ...
 
 SVG Assets to generate:
-  - magnifier_icon: Magnifying glass with circular lens and angled handle (scenes 1)
-  - checkmark_icon: Bold checkmark inside a rounded square (scene 3)
+  - magnifier_icon
+    Icon: Magnifying glass with circular lens and angled handle
+    Color: ACCENT (#33ccff)
+    Used in: Scene 1
+  - checkmark_icon
+    Icon: Bold checkmark inside a rounded square
+    Color: SUCCESS (#66ff66)
+    Used in: Scene 3
 
 Total duration: {sum of all durations}s
 Output format: MP4 (default). Would you like GIF, or both?

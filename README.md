@@ -1,122 +1,49 @@
 # /manimate
 
-A coding-agent skill that generates diagram and animation videos from natural language prompts using Manim.
+A coding-agent skill that turns natural language prompts into animated videos using Manim.
 
-![What is an MCP?](public/mcp-example.gif)
+<video src="public/manimate-intro.mp4" autoplay loop muted playsinline></video>
 
-```
-/manimate "What is an MCP?"
-```
+## Install
 
-Outputs: `.manimate/output/animation.mp4` (GIF available on request)
-
-## Installation
-
-### Via npx skills (recommended)
 ```bash
 npx skills add bassimeledath/manimate
 ```
 
-### Via npm
-```bash
-npx @bassimeledath/manimate
-```
+<details>
+<summary>Other install methods</summary>
 
-### Manual
 ```bash
-# Claude Code
+# npm
+npx @bassimeledath/manimate
+
+# Manual (Claude Code)
 git clone https://github.com/bassimeledath/manimate ~/.claude/skills/manimate
 
-# Codex
+# Manual (Codex)
 git clone https://github.com/bassimeledath/manimate ~/.codex/skills/manimate
-
-# Other agents
-git clone https://github.com/bassimeledath/manimate ~/.agents/skills/manimate
 ```
+</details>
+
+## Usage
+
+```
+/manimate "show the Pythagorean theorem"
+/manimate "explain how binary search works"
+/manimate "visualize bubble sort step by step"
+```
+
+Outputs to `.manimate/output/animation.mp4` (GIF available on request).
 
 ## Dependencies
 
-- **Python 3.8+** — Manim runtime
-- **ManimCE** — `pip install manim`
-- **ffmpeg** — video stitching and GIF conversion
-- **LaTeX** (optional) — for MathTex/Tex. Falls back to Text() if unavailable
-- A supported AI coding agent CLI (`claude`, `codex`, or set `MANIMATE_AGENT_CLI`)
-
-## Agent Configuration
-
-Manimate auto-detects your agent CLI. Override with:
-
-```bash
-export MANIMATE_AGENT_CLI="codex --quiet --full-auto"
-export MANIMATE_AGENT_ENV_UNSET="MY_AGENT_PARENT_SESSION"
-```
+- **Python 3.8+** and **ManimCE** (`pip install manim`)
+- **ffmpeg** — video stitching
+- **LaTeX** (optional) — for math expressions. Falls back to Text() if unavailable
+- A supported agent CLI (`claude`, `codex`, or set `MANIMATE_AGENT_CLI`)
 
 ## How It Works
 
-<video src="public/pipeline.mp4" autoplay loop muted playsinline></video>
+Prompt → Story → Code → Render → Video.
 
-The skill uses Manim (Community Edition) as a real animation rendering engine. The agent writes Python Scene classes, Manim renders them to video.
-
-1. **Parameter inference** — parses your prompt to determine scene count, quality, style
-2. **Preflight checks** — verifies python3, manim, ffmpeg, LaTeX availability
-3. **Story decomposition** — breaks the prompt into scenes with visual specs and continuity notes
-4. **Scene generation** — agent writes Python files with Manim Scene classes
-5. **Render + error recovery** — `manim render` produces MP4; failures are auto-corrected (max 3 retries)
-6. **Stitch + convert** — ffmpeg concatenates scenes into MP4 (GIF conversion only if requested)
-7. **Report** — output paths and sizes
-8. **Visual validation** *(optional)* — agent reads last-frame PNGs and checks text readability, color consistency, layout balance, and animation completeness; offers to regenerate failed scenes
-
-## Examples
-
-```
-# Simple (1 scene)
-/manimate "show the Pythagorean theorem"
-
-# Medium (2-3 scenes)
-/manimate "explain how binary search works"
-
-# Complex (3-4 scenes)
-/manimate "visualize bubble sort step by step with comparisons and swaps"
-```
-
-## Output
-
-Files are written to `.manimate/output/` in the current working directory:
-
-| File | Format | Typical Size | When |
-|------|--------|-------------|------|
-| `animation.mp4` | H.264 MP4 | 0.5-3MB | Always (default) |
-| `animation.gif` | Animated GIF | 1-5MB | Only when user requests GIF |
-
-Last-frame PNGs for each scene are saved to `.manimate/lastframes/`.
-
-## Architecture
-
-```
-/manimate "explain binary search"
-    |
-    |- Step 1: Infer parameters (scenes, quality, style)
-    |- Step 2: Preflight (python3, manim, ffmpeg, latex?, timeout?)
-    |- Step 3: Decompose into scenes -> story.json
-    |- Step 4: Generate scenes sequentially (agent writes Python)
-    |          Each scene validated: file exists + defines Scene class + valid syntax
-    |- Step 5: Render each scene (manim render --renderer=cairo)
-    |          Error recovery: parse error -> fix worker -> retry (max 3)
-    |- Step 6: Stitch + convert (ffmpeg concat -> MP4 + GIF)
-    |- Step 7: Report output paths
-    '- Step 8: (Optional) Visual validation of last-frame PNGs
-```
-
-## Component Library
-
-Reference docs injected into worker prompts:
-
-- **cheatsheet.md** — Manim API quick reference (Mobjects, animations, positioning, colors)
-- **style-guide.md** — color palette, font sizes, spacing, timing conventions
-- **animations.md** — animation patterns with code examples
-- **text-and-math.md** — Text, MathTex, Code block patterns
-- **common-errors.md** — known pitfalls and fixes
-
-Templates for different scene types: basic, math, graph, code.
-
-Working examples: binary search, quadratic formula, bubble sort.
+The agent decomposes your prompt into scenes, writes Manim Python code for each, renders via Cairo, and stitches the results with ffmpeg. Failed renders auto-recover (max 3 retries). An optional visual validation step checks layout and readability.
