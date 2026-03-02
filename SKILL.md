@@ -17,7 +17,7 @@ Generate diagram and animation videos from natural language descriptions using M
 
 ## Pipeline
 
-When the user invokes `/manimate`, execute these steps in order (Steps 1-8 are the core pipeline; Step 9 is an optional visual validation offered after the report):
+When the user invokes `/manimate`, execute these 12 steps in order:
 
 ---
 
@@ -92,7 +92,7 @@ else
   echo "  Install: brew install --cask mactex-no-gui (macOS) or apt install texlive-full (Linux)"
 fi
 
-# Detect timeout command (used for render timeouts in Step 6)
+# Detect timeout command (used for render timeouts in Step 10)
 TIMEOUT_CMD=""
 if command -v gtimeout >/dev/null 2>&1; then
   TIMEOUT_CMD="gtimeout"
@@ -107,7 +107,7 @@ Create working directory:
 
 ```bash
 rm -rf .manimate
-mkdir -p .manimate/scenes .manimate/lastframes .manimate/output
+mkdir -p .manimate/scenes .manimate/assets .manimate/lastframes .manimate/output
 ```
 
 > **Pipeline-wide LATEX_AVAILABLE flag**: When `false`, scene code must NOT use MathTex or Tex — use Text() for all text, including math expressions. Render equations as Unicode or ASCII.
@@ -124,13 +124,25 @@ Prefer custom SVG icons for: servers, databases, users/people, documents, locks/
 
 Use basic Manim shapes only for: array cells, flowchart boxes, graphs/axes, code blocks, bullets/dots, containers, math expressions.
 
-Each scene spec should include an `svg_assets` field listing the custom SVG icons the scene needs. This tells the scene generator which concepts deserve custom illustrations.
-
-Write `.manimate/story.json`:
+Write `.manimate/story.json` with a top-level `asset_manifest` and per-scene `svg_assets` referencing manifest keys:
 
 ```json
 {
   "title": "How Binary Search Works",
+  "asset_manifest": {
+    "magnifier_icon": {
+      "description": "Magnifying glass with circular lens and angled handle",
+      "viewbox": "0 0 64 64",
+      "primary_color_token": "ACCENT",
+      "used_in": [1]
+    },
+    "checkmark_icon": {
+      "description": "Bold checkmark inside a rounded square",
+      "viewbox": "0 0 64 64",
+      "primary_color_token": "SUCCESS",
+      "used_in": [3]
+    }
+  },
   "scenes": [
     {
       "id": 1,
@@ -138,7 +150,7 @@ Write `.manimate/story.json`:
       "description": "Show a sorted array of numbers. Highlight that we need to find a target value.",
       "visual_elements": ["sorted array of boxes with numbers", "target value highlighted"],
       "animations": ["Create array", "Highlight target", "Write question text"],
-      "svg_assets": [],
+      "svg_assets": ["magnifier_icon"],
       "scene_class": "TheProblem",
       "duration": 8,
       "template": "basic",
@@ -166,13 +178,15 @@ Write `.manimate/story.json`:
 }
 ```
 
-**Example `svg_assets` for an API authentication scene:**
-```json
-"svg_assets": ["user_icon", "server_icon", "lock_icon", "key_icon", "shield_icon"]
-```
+**`asset_manifest` schema**: Each key is an asset ID (snake_case). Fields:
+- `description` — what the icon depicts, enough detail for accurate SVG generation
+- `viewbox` — SVG viewBox (tall: `"0 0 80 100"`, square: `"0 0 64 64"`, wide: `"0 0 100 60"`)
+- `primary_color_token` — which palette token to use as the main fill (`PRIMARY`, `ACCENT`, `HIGHLIGHT`, `SUCCESS`, `NEGATIVE`)
+- `used_in` — list of scene IDs that use this asset
 
-The scene code will generate the actual SVG strings inline based on these asset names — they are hints, not file references.
-```
+**Per-scene `svg_assets`** is a list of asset IDs from the manifest (not freeform hints). If a scene needs no SVG assets, use an empty list `[]`.
+
+**If no scenes need SVG assets** (e.g., a pure math derivation), set `asset_manifest` to `{}` and all `svg_assets` to `[]`. Steps 6-7 will no-op.
 
 **Continuity rules:**
 - `continuity_out` of scene N must match `continuity_in` of scene N+1
@@ -189,7 +203,7 @@ The scene code will generate the actual SVG strings inline based on these asset 
 
 ### Step 4: Outline Confirmation
 
-Before generating any scene code, present the story outline to the user for review and approval.
+Before generating any code, present the story outline to the user for review and approval.
 
 **Build a readable summary from `.manimate/story.json`:**
 
@@ -207,6 +221,10 @@ Scene Outline for: "{title}"
     Duration: {duration}s
 
   ...
+
+SVG Assets to generate:
+  - magnifier_icon: Magnifying glass with circular lens and angled handle (scenes 1)
+  - checkmark_icon: Bold checkmark inside a rounded square (scene 3)
 
 Total duration: {sum of all durations}s
 Output format: MP4 (default). Would you like GIF, or both?
@@ -231,9 +249,227 @@ Once approved, proceed to Step 5.
 
 ---
 
-### Step 5: Scene Generation (Inline)
+### Step 5: Shared Preamble Generation
 
-Generate each scene file directly. No sub-processes — the orchestrating agent writes the code itself, ensuring the user's chosen model is used for generation.
+Generate `.manimate/shared.py` — a single module containing palette constants, helpers, and asset loading that all scenes import. This eliminates ~50 lines of duplicated boilerplate from each scene file.
+
+**Write `.manimate/shared.py`** with these contents (adapt colors from `shared_style` in story.json):
+
+```python
+from manim import *
+import tempfile, os
+
+# ── Creative Chaos Dark (from story.json shared_style) ──
+BG        = "#2a2a3a"
+SURFACE   = "#3a3a4a"
+BORDER    = "#4a4a5a"
+PRIMARY   = "#ff3366"
+ACCENT    = "#33ccff"
+HIGHLIGHT = "#ffcc00"
+SUCCESS   = "#66ff66"
+NEGATIVE  = "#ff4444"
+TEXT_CLR  = "#ffffff"
+TEXT_DIM  = "#6a6a8a"
+
+# ── Asset directory ──
+ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+
+
+def svg_icon(svg_string, scale=1.0):
+    """Write inline SVG to temp file and load as SVGMobject.
+    Use for rare one-off SVGs (under 5 lines). Prefer load_asset() for validated assets."""
+    tmpdir = tempfile.mkdtemp()
+    path = os.path.join(tmpdir, "icon.svg")
+    with open(path, "w") as f:
+        f.write(svg_string)
+    return SVGMobject(path).scale(scale)
+
+
+def load_asset(asset_id, scale=1.0):
+    """Load a validated SVG asset from .manimate/assets/."""
+    path = os.path.join(ASSET_DIR, f"{asset_id}.svg")
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Asset not found: {path}")
+    return SVGMobject(path).scale(scale)
+
+
+def tw(text_str):
+    """Calculate reading time wait duration: max(2, word_count / 3)."""
+    return max(2, len(text_str.split()) / 3)
+
+
+def dot_grid():
+    """Create the signature Creative Chaos dot grid background."""
+    return VGroup(*[
+        Dot([x, y, 0], radius=0.02, fill_opacity=0.08, color=TEXT_CLR)
+        for x in range(-7, 8) for y in range(-4, 5)
+    ])
+
+
+def setup_scene(scene):
+    """Set background color and add dot grid. Call at the start of construct()."""
+    scene.camera.background_color = BG
+    scene.add(dot_grid())
+
+
+def title_card(scene, text, wait=1.5):
+    """Show title with signature underline, then move to corner.
+
+    Args:
+        scene: the Scene instance (pass `self` from construct)
+        text: the title string
+        wait: seconds to display before moving to corner (default 1.5)
+    Returns:
+        title Mobject (now in the UL corner at scale 0.55)
+    """
+    title = Text(text, font="Galvji", font_size=44, color=TEXT_CLR, weight=BOLD)
+    underline = Line(
+        title.get_left() + DOWN * 0.35,
+        title.get_right() + DOWN * 0.35,
+        color=PRIMARY, stroke_width=2.5,
+    )
+    scene.play(
+        FadeIn(title, shift=UP * 0.4),
+        GrowFromCenter(underline),
+        run_time=0.7,
+    )
+    scene.wait(wait)
+    scene.play(
+        title.animate.scale(0.55).to_corner(UL, buff=0.5),
+        FadeOut(underline, run_time=0.3),
+        run_time=0.5,
+    )
+    return title
+
+
+def make_node(label, color=None, w=2.5, h=0.8):
+    """Create a labeled rounded rectangle node for diagrams."""
+    if color is None:
+        color = PRIMARY
+    box = RoundedRectangle(
+        corner_radius=0.15, width=w, height=h,
+        fill_color=SURFACE, fill_opacity=1,
+        stroke_color=color, stroke_width=1.5,
+    )
+    text = Text(label, font="Avenir Next", font_size=22, color=TEXT_CLR)
+    text.move_to(box)
+    return VGroup(box, text)
+```
+
+**Populate palette values** from `story.json` `shared_style` — if the user chose a light theme, use the light palette hex values instead.
+
+**Scene files import via:**
+
+```python
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from shared import *
+```
+
+This works because render runs from `.manimate/` as CWD (`cd .manimate && manim render scenes/scene_NN.py`).
+
+---
+
+### Step 6: Asset Generation
+
+For each entry in `asset_manifest` from story.json, generate a validated SVG file.
+
+**If `asset_manifest` is empty `{}`**, skip this step and Step 7 entirely.
+
+**For each asset in the manifest:**
+
+1. Read the `description`, `viewbox`, and `primary_color_token` from the manifest entry
+2. Read the SVG Icon Style Rules from `library/style-guide.md`
+3. Generate the SVG file following these constraints:
+   - Flat fills only — NO gradients, NO filters, NO `<text>` elements, NO `stroke-dasharray`
+   - Use palette hex colors from `shared_style` (e.g., `#ff3366` for PRIMARY, not Manim color names)
+   - Outer strokes: `stroke="#ffffff" stroke-width="2"`
+   - Detail strokes: `stroke-width="1.5"`
+   - Line endings: `stroke-linecap="round" stroke-linejoin="round"`
+   - Center content within the viewBox
+   - Keep simple — Manim's SVG parser handles basic shapes well but struggles with complex paths
+4. Write the SVG file to `.manimate/assets/{asset_id}.svg`
+
+```bash
+# Verify each asset file was written
+for ASSET_ID in $(python3 -c "
+import json
+m = json.load(open('.manimate/story.json'))['asset_manifest']
+print(' '.join(m.keys()))
+"); do
+  [ -f ".manimate/assets/${ASSET_ID}.svg" ] || echo "Missing asset: ${ASSET_ID}"
+done
+```
+
+---
+
+### Step 7: Asset Validation Gate
+
+Verify all generated SVG assets render correctly in Manim before using them in scenes.
+
+**If `asset_manifest` is empty**, skip this step.
+
+**Procedure:**
+
+1. Write a temporary validation scene `.manimate/scenes/_asset_validation.py`:
+
+```python
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from shared import *
+
+class AssetValidation(Scene):
+    def construct(self):
+        setup_scene(self)
+        title = Text("Asset Validation", font="Galvji", font_size=32,
+                      color=TEXT_CLR, weight=BOLD)
+        title.to_edge(UP, buff=0.5)
+        self.add(title)
+
+        assets = []
+        # One VGroup(icon, label) per asset — filled dynamically
+        # ASSET_ENTRIES_PLACEHOLDER
+
+        if assets:
+            grid = VGroup(*assets).arrange_in_grid(
+                rows=max(1, (len(assets) + 2) // 3),
+                cols=min(3, len(assets)),
+                buff=1.0,
+            )
+            grid.move_to(DOWN * 0.3)
+            self.add(grid)
+        self.wait(1)
+```
+
+2. Fill in the asset loading code for each manifest entry (load via `load_asset()`, add a label below each icon)
+
+3. Render the validation scene as a still frame:
+
+```bash
+cd .manimate && manim render -ql -s --renderer=cairo --disable_caching \
+  scenes/_asset_validation.py AssetValidation 2>/dev/null
+```
+
+4. Find and read the output PNG:
+
+```bash
+VALIDATION_PNG=$(find .manimate/media/images -name "AssetValidation*.png" 2>/dev/null | head -1)
+```
+
+5. Inspect the grid image. For each asset, verify:
+   - The icon is **recognizable** (matches the description)
+   - Colors are **correct** (matches the `primary_color_token`)
+   - Rendering is **clean** (no artifacts, broken paths, or missing elements)
+
+6. If any asset fails: regenerate its SVG file, re-render the grid (max 2 retries per asset)
+
+7. Clean up: `rm .manimate/scenes/_asset_validation.py`
+
+---
+
+### Step 8: Scene Generation
+
+Generate each scene file. Scenes import from `shared.py` and load assets via `load_asset()` — no inlined palette constants or helper functions.
 
 **For each scene N (sequentially):**
 
@@ -253,28 +489,38 @@ Generate each scene file directly. No sub-processes — the orchestrating agent 
 
 4. **Write the scene file** to `.manimate/scenes/scene_NN.py` following these rules:
 
-   1. Use `from manim import *` (NOT manimlib — that is ManimGL)
+   1. Start with the shared import: `import sys, os` / `sys.path.insert(...)` / `from shared import *`
    2. Define exactly ONE Scene subclass named `{scene_class}` (from story.json)
    3. All animation logic goes in the `construct(self)` method
-   4. Use self.play() for animations, self.wait() for pauses
-   5. Use the shared_style colors/sizes for consistency across scenes
-   6. Inline all constants — do NOT import from external modules
-   7. Keep the scene self-contained (no file I/O, no network)
-   8. Target duration: ~{duration}s (use self.wait() to pad if needed)
-   9. Use .animate syntax for simple property changes
-   10. Use Transform/ReplacementTransform for morphing between objects
-   11. If `latex_available` is false: do NOT use MathTex or Tex — use Text() for all text including math. Render equations as Unicode. If true: use MathTex (not Tex) for math expressions.
-   12. For real-world concepts (servers, databases, users, documents, locks, etc.), generate a custom SVG icon at runtime instead of using a basic rectangle or circle. Use the svg_icon() helper and follow the SVG Icon Style Rules in the style guide. SVGs must use flat colors only — NO gradients, NO filters, NO `<text>` elements, NO stroke-dasharray. Use Manim Text() for all labels.
-   13. Define SVG strings as Python string constants at the top of the scene, write them via the svg_icon() helper. Keep SVGs simple with viewBox="0 0 80 100" or similar. Use colors from the shared_style palette.
+   4. Call `setup_scene(self)` at the start of `construct()` (sets BG + dot grid)
+   5. Use `title_card(self, "...")` for the title entrance
+   6. Use `load_asset(asset_id, scale)` for SVG icons from the manifest
+   7. Use `svg_icon()` only for rare one-off inline SVGs (under 5 SVG lines)
+   8. Use `tw(text_string)` for reading time: `self.wait(tw("your text here"))`
+   9. Use `make_node(label, color)` for diagram nodes
+   10. Keep the scene self-contained (no file I/O beyond asset loading, no network)
+   11. Target duration: ~{duration}s (use self.wait() to pad if needed)
+   12. Use .animate syntax for simple property changes
+   13. Use Transform/ReplacementTransform for morphing between objects
+   14. If `latex_available` is false: do NOT use MathTex or Tex — use Text() for all text including math. Render equations as Unicode. If true: use MathTex (not Tex) for math expressions.
+
+   **Layout Rules (CRITICAL — prevents overlapping elements):**
+
+   15. Use `next_to()`, `arrange()`, `arrange_in_grid()` for spatially-related elements — NOT absolute coordinates
+   16. Group with `VGroup()` before positioning — position the group, not individual items
+   17. Absolute coords only for placing independent groups at anchor positions (e.g., `left_panel.move_to(LEFT * 3)`)
+   18. Never place content within 0.8 units of the frame edge
 
    **Text Pacing Rules (CRITICAL — text must be readable):**
 
-   14. After EVERY Write(text) or FadeIn(text), add a reading pause: `self.wait(max(2, len("your text content".split()) / 3))` — this gives ~180 WPM reading speed with a 2-second minimum.
-   15. Title cards: display for at least 2 seconds before animating to corner/top
-   16. Key insight or annotation text: minimum 3 seconds on screen
-   17. NEVER use bare `self.wait()` after text — always calculate from word count
-   18. NEVER use `self.wait(0.5)` or `self.wait(1)` after text that has more than 3 words
-   19. Between conceptual sections, use `self.wait(1.5)` as a transition pause
+   19. After EVERY Write(text) or FadeIn(text), add a reading pause: `self.wait(tw("your text content"))` — this gives ~180 WPM reading speed with a 2-second minimum.
+   20. Title cards: display for at least 2 seconds before animating to corner/top
+   21. Key insight or annotation text: minimum 3 seconds on screen
+   22. NEVER use bare `self.wait()` after text — always calculate from word count
+   23. NEVER use `self.wait(0.5)` or `self.wait(1)` after text that has more than 3 words
+   24. Between conceptual sections, use `self.wait(1.5)` as a transition pause
+
+**Expected scene size**: 80-130 lines (vs 180-230 with inlined constants).
 
 5. **Validate the generated file:**
 
@@ -301,9 +547,47 @@ If validation fails (syntax error or wrong class name), fix the file immediately
 
 ---
 
-### Step 6: Render & Error Recovery
+### Step 9: Layout Validation Gate
 
-For each scene, render with Manim. If rendering fails, read the error output, fix the scene file directly, and retry. Max 3 attempts per scene.
+After writing each scene, validate the layout visually. Scenes end with `FadeOut(*self.mobjects)` which makes the last frame blank — so we extract a mid-animation frame instead.
+
+**For each scene N:**
+
+1. **Render a low-quality video** (fast: ~5-10s at 480p 15fps):
+
+```bash
+cd .manimate && manim render -ql --renderer=cairo --disable_caching \
+  scenes/scene_$(printf "%02d" $N).py $SCENE_CLASS 2>/dev/null
+```
+
+2. **Extract a frame at ~2 seconds** (frame 30 at 15fps) — content should be visible before exit animations:
+
+```bash
+SCENE_FILE="scene_$(printf "%02d" $N)"
+VIDEO_PATH=$(find .manimate/media/videos/${SCENE_FILE} -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
+ffmpeg -i "$VIDEO_PATH" \
+  -vf "select=eq(n\,30)" -vframes 1 -y \
+  .manimate/lastframes/${SCENE_FILE}_layout.png 2>/dev/null
+```
+
+3. **Read the extracted PNG** and evaluate against this rubric:
+
+| Check | Pass condition |
+|-------|---------------|
+| Text readability | No text cut off or extending beyond frame |
+| No overlaps | All elements visible, no unintended overlap |
+| Asset rendering | SVG icons recognizable and properly colored |
+| Safe margins | Nothing within 0.8 units of frame edge |
+
+4. **If any check fails**: fix the scene positioning code, re-render at `-ql`, re-inspect (max 2 retries per scene)
+
+> **Cost**: ~5-10s per scene for a `-ql` render vs 60-180s for a wasted full render. This catches layout issues early.
+
+---
+
+### Step 10: Full Render & Recovery
+
+For each scene, render at the target quality. If rendering fails, read the error output, fix the scene file directly, and retry. Max 3 attempts per scene.
 
 **Output path resolution**: Manim writes to structured subdirs. After each render, resolve the actual output path.
 
@@ -336,17 +620,6 @@ if [ ! -f "$EXPECTED_PATH" ]; then
 fi
 ```
 
-Then capture a last-frame PNG for visual validation:
-
-```bash
-manim render -ql -s --renderer=cairo --disable_caching \
-  ".manimate/scenes/${SCENE_FILE}.py" "$SCENE_CLASS" 2>/dev/null || true
-LASTFRAME=$(find .manimate/media/images -name "*.png" -newer ".manimate/scenes/${SCENE_FILE}.py" 2>/dev/null | head -1)
-if [ -n "$LASTFRAME" ]; then
-  cp "$LASTFRAME" ".manimate/lastframes/scene_$(printf "%02d" $N).png"
-fi
-```
-
 **On failure (up to 3 retries):**
 
 1. Read the render error output from the log file
@@ -357,7 +630,7 @@ fi
 
 ---
 
-### Step 7: Stitch & Convert
+### Step 11: Stitch & Convert
 
 Run the render script to concatenate scene videos and convert to GIF:
 
@@ -374,7 +647,7 @@ bash "scripts/render.sh" \
 
 ---
 
-### Step 8: Report
+### Step 12: Report
 
 ```
 Animation complete!
@@ -385,74 +658,25 @@ Duration: 28s (8s + 12s + 8s)
 Quality: 1080p @ 60fps
 Renderer: cairo
 
+Assets: 2 SVGs generated and validated (magnifier_icon, checkmark_icon)
+Layout validation: 3/3 scenes passed
+
 Output:
   MP4: .manimate/output/animation.mp4 (1.2MB)
   GIF: .manimate/output/animation.gif (3.4MB)
-  Last-frame previews: .manimate/lastframes/
+  Layout previews: .manimate/lastframes/
 ```
-
----
-
-### Step 9: Visual Validation (Optional)
-
-After reporting, ask the user:
-
-```
-Would you like me to validate the animation quality before you see it? (recommended for final delivery)
-```
-
-If the user declines, skip this step entirely. If the user accepts, evaluate each scene's last-frame PNG.
-
-**For each scene, read `.manimate/lastframes/scene_NN.png` and evaluate against this rubric:**
-
-| Criterion | What to check | Pass condition |
-|-----------|--------------|----------------|
-| **Text readability** | All text visible, not cut off, readable size | No text extends beyond frame edges; font size >= 24px equivalent |
-| **Color consistency** | Colors match `shared_style` from story.json | Background, accent, highlight, and text colors match the palette |
-| **Layout balance** | No overlapping elements, nothing off-screen | All Mobjects within frame bounds; no unintended overlap |
-| **Animation completeness** | Final frame shows expected end state | Last frame matches the scene's `description` / `continuity_out` |
-
-**Evaluation process:**
-
-1. Read `.manimate/story.json` to get `shared_style` and each scene's expected end state
-2. For each scene, read the last-frame PNG from `.manimate/lastframes/scene_NN.png`
-3. Evaluate the image against the four rubric criteria
-4. Compile results
-
-**Report format:**
-
-```
-Visual Validation Results:
-
-  Scene 1 (TheProblem): PASS
-  Scene 2 (TheSolution): FAIL
-    - Text readability: title text cut off on right edge
-    - Layout balance: array boxes overlap with subtitle
-  Scene 3 (TheResult): PASS
-
-Summary: 2/3 scenes passed
-```
-
-If any scenes fail, ask:
-
-```
-Scene(s) 2 failed validation. Would you like to regenerate the failed scene(s)?
-```
-
-If the user accepts, re-run Steps 5-6 for the failed scenes only, then re-stitch in Step 7 and re-validate.
-
-> **Note**: This step uses only the agent's built-in image reading capability — no external dependencies required.
 
 ---
 
 ## Component Library Reference
 
-Read these library files before writing each scene (see Step 5 for which files apply per scene type):
+Read these library files before writing each scene (see Step 8 for which files apply per scene type):
 
 | File | Purpose | Used by |
 |------|---------|---------|
 | `library/cheatsheet.md` | Manim API quick reference | All scene types |
-| `library/style-guide.md` | Color palette, font sizes, timing, SVG style rules | All scene types |
+| `library/style-guide.md` | Color palette, font sizes, timing, SVG style rules, layout best practices | All scene types |
 | `library/animations.md` | Animation patterns with code | basic, math, graph |
 | `library/text-and-math.md` | Text, MathTex, Code patterns | math, code |
 | `library/common-errors.md` | Known pitfalls and fixes | All scene types |
@@ -462,9 +686,12 @@ Read these library files before writing each scene (see Step 5 for which files a
 1. **ManimCE only** — `from manim import *` (never `manimlib`). Cairo renderer for headless safety.
 2. **One Scene class per file** — each scene is a separate `.py` file for isolated error recovery.
 3. **Inline generation** — the orchestrating agent writes scene files directly (no sub-processes), ensuring the user's chosen model is used throughout.
-4. **Shared style via story.json** — colors, font sizes, and background are defined once and referenced by every scene for consistency.
-5. **LaTeX fallback** — if LaTeX is unavailable, use `Text()` instead of `MathTex()`.
-6. **Render timeout** — 180s timeout on render commands to catch hangs.
-7. **Error recovery** — on render failure, read the error, fix the scene file, and retry. Max 3 attempts per scene.
-8. **Selective library reads** — only read library docs relevant to the scene type to stay focused.
-9. **SVG-forward visuals** — for real-world concepts (servers, users, databases, etc.), generate custom inline SVG icons instead of basic shapes. This is manimate's key visual differentiator.
+4. **Shared preamble** — `shared.py` contains palette constants, helpers (`setup_scene`, `title_card`, `dot_grid`, `tw`, `make_node`), and asset loading (`load_asset`). Scenes import, not copy.
+5. **Asset-first** — SVG icons are generated and validated in Steps 6-7 before scene code is written. Scenes load validated assets via `load_asset()`, not inline SVG strings.
+6. **Two validation gates** — asset grid (Step 7) and layout frame (Step 9) catch visual issues before the expensive full render in Step 10.
+7. **Import from shared.py** — scenes use `from shared import *` for palette, helpers, and asset loading. No inlined constants.
+8. **LaTeX fallback** — if LaTeX is unavailable, use `Text()` instead of `MathTex()`.
+9. **Render timeout** — 180s timeout on render commands to catch hangs.
+10. **Error recovery** — on render failure, read the error, fix the scene file, and retry. Max 3 attempts per scene.
+11. **Selective library reads** — only read library docs relevant to the scene type to stay focused.
+12. **SVG-forward visuals** — for real-world concepts (servers, users, databases, etc.), generate custom SVG icons validated before use. This is manimate's key visual differentiator.

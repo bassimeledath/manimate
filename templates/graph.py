@@ -1,35 +1,39 @@
-from manim import *
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from shared import *
 
-BG_COLOR = "#1e1e2e"
-ACCENT = BLUE
-HIGHLIGHT = YELLOW
-TEXT_CLR = WHITE
-TITLE_SIZE = 48
-LABEL_SIZE = 24
 
 class GraphScene(Scene):
     def construct(self):
-        self.camera.background_color = BG_COLOR
+        setup_scene(self)
 
-        # --- Title ---
-        title = Text("Graph Title", font_size=TITLE_SIZE, color=TEXT_CLR)
-        self.play(Write(title))
-        self.wait(1)
-        self.play(title.animate.to_edge(UP).scale(0.6))
+        # 1. Title card
+        title = title_card(self, "Graph Title")
 
-        # --- Axes ---
+        # 2. Axes
         axes = Axes(
             x_range=[0, 10, 1],
             y_range=[0, 100, 10],
-            axis_config={"include_numbers": True, "color": TEXT_CLR},
+            axis_config={
+                "color": TEXT_DIM,
+                "stroke_width": 1.5,
+                "include_numbers": True,
+            },
+            x_length=8,
+            y_length=5,
         )
-        self.play(Create(axes), run_time=1.5)
+        self.play(Create(axes), run_time=1.0)
 
-        # --- Plot ---
-        graph = axes.plot(lambda x: x**2, color=ACCENT)
-        label = axes.get_graph_label(graph, label="f(x)", color=ACCENT)
-        self.play(Create(graph), Write(label), run_time=2)
+        # 3. Plot curve
+        graph = axes.plot(lambda x: x**2, color=PRIMARY)
+        label = Text("O(n\u00b2)", font="Monaco", font_size=20, color=PRIMARY)
+        label.next_to(graph.get_end(), RIGHT, buff=0.2)
+        self.play(Create(graph), run_time=1.5)
+        self.play(FadeIn(label, shift=UP * 0.2), run_time=0.3)
         self.wait(2)
 
-        # --- Cleanup ---
-        self.play(*[FadeOut(mob) for mob in self.mobjects])
+        # 4. Exit
+        self.play(
+            *[FadeOut(mob, shift=DOWN * 0.3) for mob in self.mobjects],
+            run_time=0.4,
+        )

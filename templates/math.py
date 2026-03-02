@@ -1,31 +1,40 @@
-from manim import *
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from shared import *
 
-BG_COLOR = "#1e1e2e"
-ACCENT = BLUE
-HIGHLIGHT = YELLOW
-TEXT_CLR = WHITE
-TITLE_SIZE = 48
-BODY_SIZE = 36
 
 class MathScene(Scene):
     def construct(self):
-        self.camera.background_color = BG_COLOR
+        setup_scene(self)
 
-        # --- Title ---
-        title = Text("Mathematical Concept", font_size=TITLE_SIZE, color=TEXT_CLR)
-        self.play(Write(title))
-        self.wait(1)
-        self.play(title.animate.to_edge(UP).scale(0.6))
+        # 1. Title card
+        title = title_card(self, "Mathematical Concept")
 
-        # --- Equation ---
-        eq1 = MathTex(r"a^2 + b^2 = c^2", font_size=BODY_SIZE)
-        self.play(Write(eq1))
-        self.wait(1)
+        # 2. Equation in a card
+        card = RoundedRectangle(
+            corner_radius=0.15, width=8, height=2.5,
+            fill_color=SURFACE, fill_opacity=0.8,
+            stroke_color=BORDER, stroke_width=1,
+        )
+        card.move_to(DOWN * 0.3)
 
-        # --- Transform ---
-        eq2 = MathTex(r"c = \sqrt{a^2 + b^2}", font_size=BODY_SIZE)
-        self.play(TransformMatchingTex(eq1, eq2))
+        eq1 = MathTex(r"a^2 + b^2 = c^2", font_size=48)
+        eq1.set_color(TEXT_CLR)
+        eq1.move_to(card)
+
+        self.play(FadeIn(card, shift=UP * 0.4), run_time=0.4)
+        self.play(Write(eq1), run_time=1.0)
         self.wait(2)
 
-        # --- Cleanup ---
-        self.play(*[FadeOut(mob) for mob in self.mobjects])
+        # 3. Transform
+        eq2 = MathTex(r"c = \sqrt{a^2 + b^2}", font_size=48)
+        eq2.set_color(TEXT_CLR)
+        eq2.move_to(card)
+        self.play(TransformMatchingTex(eq1, eq2), run_time=0.6)
+        self.wait(2)
+
+        # 4. Exit
+        self.play(
+            *[FadeOut(mob, shift=DOWN * 0.3) for mob in self.mobjects],
+            run_time=0.4,
+        )

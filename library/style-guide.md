@@ -245,6 +245,52 @@ class MyScene(Scene):
 - **Labels**: `next_to(referent, DOWN, buff=0.3)` — below, not beside
 - **Section tag**: small PRIMARY-colored text at `UL` above the title — `font_size=16, weight=BOLD`
 
+### Layout Best Practices — Preventing Overlaps
+
+Default to **relative positioning** for spatially-related elements:
+
+```python
+# Label below icon — not absolute coords
+label.next_to(icon, DOWN, buff=0.3)
+
+# Row of items — not individual move_to calls
+VGroup(a, b, c).arrange(RIGHT, buff=0.8)
+
+# Grid layout — not manual coordinate math
+items.arrange_in_grid(rows=2, cols=3, buff=0.8)
+```
+
+**Absolute coords for anchor points only** — placing independent groups at their starting position:
+
+```python
+# Place a group at a known anchor point
+left_panel.move_to(LEFT * 3)
+right_panel.move_to(RIGHT * 3)
+
+# Then connect with relative positioning
+arrow = Arrow(left_panel.get_right(), right_panel.get_left(),
+              color=BORDER, stroke_width=1.5, tip_length=0.15, buff=0.1)
+```
+
+**Group before position** — build `VGroup` of related elements, arrange internally, then position the group as a unit:
+
+```python
+# GOOD: group → arrange → position
+node_label = Text("API", font="Avenir Next", font_size=20, color=TEXT_CLR)
+node_box = RoundedRectangle(corner_radius=0.15, width=2.2, height=0.8,
+                            fill_color=SURFACE, fill_opacity=1,
+                            stroke_color=PRIMARY, stroke_width=1.5)
+node_label.move_to(node_box)
+node = VGroup(node_box, node_label)
+
+# Position the GROUP, not individual pieces
+node.move_to(LEFT * 2 + DOWN * 0.5)
+
+# BAD: positioning pieces independently
+# node_box.move_to(LEFT * 2 + DOWN * 0.5)
+# node_label.move_to(LEFT * 2 + DOWN * 0.5)  # fragile, breaks on resize
+```
+
 ---
 
 ## Motion

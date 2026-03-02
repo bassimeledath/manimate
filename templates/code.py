@@ -1,40 +1,42 @@
-from manim import *
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from shared import *
 
-BG_COLOR = "#1e1e2e"
-ACCENT = BLUE
-HIGHLIGHT = YELLOW
-TEXT_CLR = WHITE
-TITLE_SIZE = 48
-CODE_SIZE = 20
 
 class CodeScene(Scene):
     def construct(self):
-        self.camera.background_color = BG_COLOR
+        setup_scene(self)
 
-        # --- Title ---
-        title = Text("Code Walkthrough", font_size=TITLE_SIZE, color=TEXT_CLR)
-        self.play(Write(title))
-        self.wait(1)
-        self.play(title.animate.to_edge(UP).scale(0.6))
+        # 1. Title card
+        title = title_card(self, "Code Walkthrough")
 
-        # --- Code Block ---
+        # 2. Code Block
         code = Code(
             code="def example():\n    return 42",
             language="python",
-            font_size=CODE_SIZE,
-            background="window",
+            font_size=18,
+            background="rectangle",
+            background_stroke_color=BORDER,
+            background_stroke_width=1,
+            line_spacing=0.6,
         )
-        self.play(Create(code))
+        self.play(FadeIn(code, shift=UP * 0.4), run_time=0.5)
         self.wait(2)
 
-        # --- Highlight a line ---
-        highlight = SurroundingRectangle(
-            code.code[1],  # second line
-            color=HIGHLIGHT,
-            buff=0.05,
+        # 3. Highlight a line — rounded highlight
+        highlight = RoundedRectangle(
+            corner_radius=0.08,
+            width=code.width - 0.2,
+            height=0.35,
+            fill_color=PRIMARY, fill_opacity=0.12,
+            stroke_width=0,
         )
-        self.play(Create(highlight))
-        self.wait(1)
+        highlight.move_to(code.code[1])
+        self.play(FadeIn(highlight), run_time=0.3)
+        self.wait(1.5)
 
-        # --- Cleanup ---
-        self.play(*[FadeOut(mob) for mob in self.mobjects])
+        # 4. Exit
+        self.play(
+            *[FadeOut(mob, shift=DOWN * 0.3) for mob in self.mobjects],
+            run_time=0.4,
+        )
