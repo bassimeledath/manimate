@@ -92,24 +92,7 @@ else
   echo "  Install: brew install --cask mactex-no-gui (macOS) or apt install texlive-full (Linux)"
 fi
 
-# Detect agent CLI
-MANIMATE_AGENT_CLI="${MANIMATE_AGENT_CLI:-}"
-if [ -z "$MANIMATE_AGENT_CLI" ]; then
-  if command -v claude >/dev/null 2>&1; then
-    MANIMATE_AGENT_CLI="claude -p --dangerously-skip-permissions"
-    MANIMATE_AGENT_ENV_UNSET="CLAUDE_CODE_ENTRYPOINT,CLAUDECODE"
-  elif command -v codex >/dev/null 2>&1; then
-    MANIMATE_AGENT_CLI="codex --quiet --full-auto"
-    MANIMATE_AGENT_ENV_UNSET=""
-  else
-    echo "No supported agent CLI found. Set MANIMATE_AGENT_CLI env var."
-    exit 1
-  fi
-fi
-AGENT_BIN=$(echo "$MANIMATE_AGENT_CLI" | awk '{print $1}')
-command -v "$AGENT_BIN" >/dev/null 2>&1 || { echo "Agent CLI '$AGENT_BIN' not found"; exit 1; }
-
-# Detect timeout command
+# Detect timeout command (used for render timeouts in Step 6)
 TIMEOUT_CMD=""
 if command -v gtimeout >/dev/null 2>&1; then
   TIMEOUT_CMD="gtimeout"
@@ -127,7 +110,7 @@ rm -rf .manimate
 mkdir -p .manimate/scenes .manimate/lastframes .manimate/output
 ```
 
-> **Pipeline-wide LATEX_AVAILABLE flag**: When `false`, worker prompts explicitly instruct the agent: "Do NOT use MathTex or Tex — use Text() for all text, including math expressions. Render equations as Unicode or ASCII."
+> **Pipeline-wide LATEX_AVAILABLE flag**: When `false`, scene code must NOT use MathTex or Tex — use Text() for all text, including math expressions. Render equations as Unicode or ASCII.
 
 ---
 
@@ -141,7 +124,7 @@ Prefer custom SVG icons for: servers, databases, users/people, documents, locks/
 
 Use basic Manim shapes only for: array cells, flowchart boxes, graphs/axes, code blocks, bullets/dots, containers, math expressions.
 
-Each scene spec should include an `svg_assets` field listing the custom SVG icons the scene needs. This tells workers which concepts deserve custom illustrations.
+Each scene spec should include an `svg_assets` field listing the custom SVG icons the scene needs. This tells the scene generator which concepts deserve custom illustrations.
 
 Write `.manimate/story.json`:
 
@@ -188,7 +171,7 @@ Write `.manimate/story.json`:
 "svg_assets": ["user_icon", "server_icon", "lock_icon", "key_icon", "shield_icon"]
 ```
 
-Workers will generate the actual SVG strings inline based on these asset names — they are hints, not file references.
+The scene code will generate the actual SVG strings inline based on these asset names — they are hints, not file references.
 ```
 
 **Continuity rules:**
@@ -197,10 +180,10 @@ Workers will generate the actual SVG strings inline based on these asset names �
 - Color palette must be consistent across all scenes (defined in `shared_style`)
 
 **Pacing rules:**
-- `text_elements` lists each text block with its approximate word count — used by workers to calculate reading pauses
+- `text_elements` lists each text block with its approximate word count — used to calculate reading pauses
 - `estimated_reading_pauses` is the total seconds of `self.wait()` needed for reading time (sum of `max(2, words / 3)` for each text block)
 - `duration` must be >= animation time + `estimated_reading_pauses` — increase duration if needed to fit reading time
-- Workers use the formula: **`self.wait(max(2, word_count / 3))`** after every text appearance
+- Use the formula: **`self.wait(max(2, word_count / 3))`** after every text appearance
 
 ---
 
@@ -248,200 +231,59 @@ Once approved, proceed to Step 5.
 
 ---
 
-### Step 5: Scene Generation (Sequential)
+### Step 5: Scene Generation (Inline)
 
-For each scene, spawn a worker using the agent CLI. Workers run **sequentially** in V1.
+Generate each scene file directly. No sub-processes — the orchestrating agent writes the code itself, ensuring the user's chosen model is used for generation.
 
-**The dispatcher reads and injects relevant library file contents into each worker prompt.** Workers are independent agent subprocesses and cannot access the skill directory.
+**For each scene N (sequentially):**
 
-**Library injection strategy** — inject only files relevant to the scene type:
+1. **Read the scene spec** from `.manimate/story.json` — extract the scene entry, `shared_style`, and `latex_available` flag.
 
-| Scene template | Always injected | Conditionally injected |
-|---------------|-----------------|----------------------|
-| All types | `cheatsheet.md`, `style-guide.md`, `common-errors.md` | — |
-| `basic` | — | `animations.md` |
-| `math` | — | `text-and-math.md`, `animations.md` |
-| `graph` | — | `animations.md` |
-| `code` | — | `text-and-math.md` |
+2. **Read the relevant library files** based on scene template type:
 
-**For each scene N:**
+| Scene template | Always read | Conditionally read |
+|---------------|------------|-------------------|
+| All types | `library/cheatsheet.md`, `library/style-guide.md`, `library/common-errors.md` | — |
+| `basic` | — | `library/animations.md` |
+| `math` | — | `library/animations.md`, `library/text-and-math.md` |
+| `graph` | — | `library/animations.md` |
+| `code` | — | `library/text-and-math.md` |
 
-1. Build the worker prompt:
+3. **Read the template** from `templates/{template}.py` (e.g., `templates/basic.py`).
 
-```bash
-SKILL_DIR="$(dirname "$(readlink -f "$0")" 2>/dev/null || cd "$(dirname "$0")" && pwd)"
+4. **Write the scene file** to `.manimate/scenes/scene_NN.py` following these rules:
 
-# Always-injected library files
-CHEATSHEET="$(cat "$SKILL_DIR/library/cheatsheet.md")"
-STYLE_GUIDE="$(cat "$SKILL_DIR/library/style-guide.md")"
-COMMON_ERRORS="$(cat "$SKILL_DIR/library/common-errors.md")"
+   1. Use `from manim import *` (NOT manimlib — that is ManimGL)
+   2. Define exactly ONE Scene subclass named `{scene_class}` (from story.json)
+   3. All animation logic goes in the `construct(self)` method
+   4. Use self.play() for animations, self.wait() for pauses
+   5. Use the shared_style colors/sizes for consistency across scenes
+   6. Inline all constants — do NOT import from external modules
+   7. Keep the scene self-contained (no file I/O, no network)
+   8. Target duration: ~{duration}s (use self.wait() to pad if needed)
+   9. Use .animate syntax for simple property changes
+   10. Use Transform/ReplacementTransform for morphing between objects
+   11. If `latex_available` is false: do NOT use MathTex or Tex — use Text() for all text including math. Render equations as Unicode. If true: use MathTex (not Tex) for math expressions.
+   12. For real-world concepts (servers, databases, users, documents, locks, etc.), generate a custom SVG icon at runtime instead of using a basic rectangle or circle. Use the svg_icon() helper and follow the SVG Icon Style Rules in the style guide. SVGs must use flat colors only — NO gradients, NO filters, NO `<text>` elements, NO stroke-dasharray. Use Manim Text() for all labels.
+   13. Define SVG strings as Python string constants at the top of the scene, write them via the svg_icon() helper. Keep SVGs simple with viewBox="0 0 80 100" or similar. Use colors from the shared_style palette.
 
-# Read scene metadata
-SCENE_TEMPLATE_NAME=$(python3 -c "
-import json
-story = json.load(open('.manimate/story.json'))
-scene = story['scenes'][$((N-1))]
-print(scene.get('template', 'basic'))
-")
+   **Text Pacing Rules (CRITICAL — text must be readable):**
 
-# Conditionally-injected library files based on scene type
-EXTRA_REFS=""
-case "$SCENE_TEMPLATE_NAME" in
-  basic)
-    EXTRA_REFS="### Animation Patterns
-$(cat "$SKILL_DIR/library/animations.md")"
-    ;;
-  math)
-    EXTRA_REFS="### Animation Patterns
-$(cat "$SKILL_DIR/library/animations.md")
+   14. After EVERY Write(text) or FadeIn(text), add a reading pause: `self.wait(max(2, len("your text content".split()) / 3))` — this gives ~180 WPM reading speed with a 2-second minimum.
+   15. Title cards: display for at least 2 seconds before animating to corner/top
+   16. Key insight or annotation text: minimum 3 seconds on screen
+   17. NEVER use bare `self.wait()` after text — always calculate from word count
+   18. NEVER use `self.wait(0.5)` or `self.wait(1)` after text that has more than 3 words
+   19. Between conceptual sections, use `self.wait(1.5)` as a transition pause
 
-### Text & Math
-$(cat "$SKILL_DIR/library/text-and-math.md")"
-    ;;
-  graph)
-    EXTRA_REFS="### Animation Patterns
-$(cat "$SKILL_DIR/library/animations.md")"
-    ;;
-  code)
-    EXTRA_REFS="### Text & Math (Code Patterns)
-$(cat "$SKILL_DIR/library/text-and-math.md")"
-    ;;
-esac
-
-# Read the appropriate template
-TEMPLATE="$(cat "$SKILL_DIR/templates/${SCENE_TEMPLATE_NAME}.py")"
-
-# Read scene spec + shared style + latex flag
-SCENE_SPEC=$(python3 -c "
-import json
-story = json.load(open('.manimate/story.json'))
-scene = story['scenes'][$((N-1))]
-scene['shared_style'] = story['shared_style']
-scene['latex_available'] = story.get('latex_available', False)
-print(json.dumps(scene, indent=2))
-")
-
-SCENE_CLASS=$(python3 -c "
-import json
-story = json.load(open('.manimate/story.json'))
-print(story['scenes'][$((N-1))]['scene_class'])
-")
-
-DURATION=$(python3 -c "
-import json
-story = json.load(open('.manimate/story.json'))
-print(story['scenes'][$((N-1))].get('duration', 8))
-")
-
-# LaTeX instruction
-LATEX_RULE=""
-if [ "$LATEX_AVAILABLE" = "false" ]; then
-  LATEX_RULE="11. LaTeX is NOT available. Do NOT use MathTex or Tex. Use Text() for all text including math. Render equations as Unicode."
-else
-  LATEX_RULE="11. If LaTeX is needed, use MathTex (not Tex) for math expressions"
-fi
-
-cat > /tmp/manimate-scene-$(printf "%02d" $N)-prompt.txt << PROMPT_EOF
-You are generating a Python file for a Manim animation scene.
-
-## Scene Specification
-$SCENE_SPEC
-
-## Template (use as starting point)
-\`\`\`python
-$TEMPLATE
-\`\`\`
-
-## Manim Reference
-
-### API Cheatsheet
-$CHEATSHEET
-
-### Style Guide
-$STYLE_GUIDE
-
-$EXTRA_REFS
-
-### Common Errors to Avoid
-$COMMON_ERRORS
-
-## Rules
-
-1. Use \`from manim import *\` (NOT manimlib — that is ManimGL)
-2. Define exactly ONE Scene subclass named \`${SCENE_CLASS}\`
-3. All animation logic goes in the \`construct(self)\` method
-4. Use self.play() for animations, self.wait() for pauses
-5. Use the shared_style colors/sizes for consistency across scenes
-6. Inline all constants — do NOT import from external modules
-7. Keep the scene self-contained (no file I/O, no network)
-8. Target duration: ~${DURATION}s (use self.wait() to pad if needed)
-9. Use .animate syntax for simple property changes
-10. Use Transform/ReplacementTransform for morphing between objects
-$LATEX_RULE
-12. For real-world concepts (servers, databases, users, documents, locks, etc.), generate a custom SVG icon at runtime instead of using a basic rectangle or circle. Use the svg_icon() helper and follow the SVG Icon Style Rules in the style guide. SVGs must use flat colors only — NO gradients, NO filters, NO <text> elements, NO stroke-dasharray. Use Manim Text() for all labels.
-13. Define SVG strings as Python string constants at the top of the scene, write them via the svg_icon() helper. Keep SVGs simple with viewBox="0 0 80 100" or similar. Use colors from the shared_style palette. LLMs generate great SVGs — no catalog needed, just follow the style guide rules.
-
-## Text Pacing Rules (CRITICAL — text must be readable)
-
-Every text element MUST stay on screen long enough to read. Apply these rules:
-
-14. After EVERY Write(text) or FadeIn(text), add a reading pause:
-    \`\`\`python
-    self.wait(max(2, len("your text content".split()) / 3))
-    \`\`\`
-    This gives ~180 WPM reading speed with a 2-second minimum.
-
-15. Title cards: display for at least 2 seconds before animating to corner/top
-16. Key insight or annotation text: minimum 3 seconds on screen
-17. NEVER use bare \`self.wait()\` after text — always calculate from word count
-18. NEVER use \`self.wait(0.5)\` or \`self.wait(1)\` after text that has more than 3 words
-19. Between conceptual sections, use \`self.wait(1.5)\` as a transition pause
-
-Examples:
-- Title "The Problem" (2 words) → \`self.wait(2)\` (minimum floor)
-- "We need to find the target value in this sorted array" (11 words) → \`self.wait(max(2, 11/3))\` = \`self.wait(3.7)\`
-- "Binary search eliminates half the remaining elements each step by comparing the target to the middle element" (16 words) → \`self.wait(max(2, 16/3))\` = \`self.wait(5.3)\`
-
-## Output
-
-Write ONLY the Python file to: .manimate/scenes/scene_$(printf "%02d" $N).py
-No explanation, no markdown — just the Python file.
-PROMPT_EOF
-```
-
-2. Spawn the worker (with timeout):
-
-```bash
-ENV_CMD="env"
-if [ -n "$MANIMATE_AGENT_ENV_UNSET" ]; then
-  IFS=',' read -ra UNSET_VARS <<< "$MANIMATE_AGENT_ENV_UNSET"
-  for var in "${UNSET_VARS[@]}"; do
-    [ -n "$var" ] && ENV_CMD="$ENV_CMD -u $var"
-  done
-fi
-
-# 120s timeout for generation worker
-if [ -n "$TIMEOUT_CMD" ]; then
-  $TIMEOUT_CMD 120 $ENV_CMD $MANIMATE_AGENT_CLI \
-    "$(cat /tmp/manimate-scene-$(printf "%02d" $N)-prompt.txt)"
-else
-  $ENV_CMD $MANIMATE_AGENT_CLI \
-    "$(cat /tmp/manimate-scene-$(printf "%02d" $N)-prompt.txt)"
-fi
-```
-
-3. Validate the generated file:
+5. **Validate the generated file:**
 
 ```bash
 FILE=".manimate/scenes/scene_$(printf "%02d" $N).py"
-
-if [ ! -f "$FILE" ]; then
-  echo "Missing: $FILE"
-  exit 1
-fi
+SCENE_CLASS="<scene_class from story.json>"
 
 python3 -c "compile(open('$FILE').read(), '$FILE', 'exec')" 2>/dev/null || {
-  echo "Syntax error in $FILE — will attempt fix during render"
+  echo "Syntax error in $FILE — fix before rendering"
 }
 
 python3 -c "
@@ -455,121 +297,63 @@ print('$FILE defines $SCENE_CLASS')
 "
 ```
 
+If validation fails (syntax error or wrong class name), fix the file immediately and re-validate before moving on.
+
 ---
 
 ### Step 6: Render & Error Recovery
 
-For each scene, render with Manim. If rendering fails, feed the error back to a fix worker.
+For each scene, render with Manim. If rendering fails, read the error output, fix the scene file directly, and retry. Max 3 attempts per scene.
 
 **Output path resolution**: Manim writes to structured subdirs. After each render, resolve the actual output path.
 
+**For each scene N**, run the render command:
+
 ```bash
-MAX_RETRIES=3
-QUALITY_SUBDIR="1080p60"  # matches -qh
+SCENE_FILE="scene_$(printf "%02d" $N)"
+SCENE_CLASS="<scene_class from story.json>"
 
-for N in $(seq 1 $TOTAL_SCENES); do
-  FILE=".manimate/scenes/scene_$(printf "%02d" $N).py"
-  SCENE_FILE="scene_$(printf "%02d" $N)"
-  SCENE_CLASS=$(python3 -c "
-import json
-story = json.load(open('.manimate/story.json'))
-print(story['scenes'][$((N-1))]['scene_class'])
-  ")
+RENDER_LOG=$(mktemp)
+RENDER_CMD="manim render scenes/${SCENE_FILE}.py $SCENE_CLASS \
+    --renderer=cairo -qh --format=mp4 --disable_caching"
 
-  RETRY=0
-  RENDER_SUCCESS=false
+if [ -n "$TIMEOUT_CMD" ]; then
+  RENDER_CMD="$TIMEOUT_CMD 180 $RENDER_CMD"
+fi
 
-  while [ $RETRY -lt $MAX_RETRIES ]; do
-    echo "Rendering scene $N ($SCENE_CLASS)..."
-
-    RENDER_LOG=$(mktemp)
-    RENDER_CMD="manim render scenes/${SCENE_FILE}.py $SCENE_CLASS \
-        --renderer=cairo -qh --format=mp4 --disable_caching"
-
-    if [ -n "$TIMEOUT_CMD" ]; then
-      RENDER_CMD="$TIMEOUT_CMD 180 $RENDER_CMD"
-    fi
-
-    if cd .manimate && eval $RENDER_CMD 2>"$RENDER_LOG"; then
-      cd ..
-
-      EXPECTED_PATH=".manimate/media/videos/${SCENE_FILE}/${QUALITY_SUBDIR}/${SCENE_CLASS}.mp4"
-      if [ -f "$EXPECTED_PATH" ]; then
-        echo "  Scene $N rendered: $EXPECTED_PATH"
-        RENDER_SUCCESS=true
-      else
-        FOUND_PATH=$(find .manimate/media/videos -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
-        if [ -n "$FOUND_PATH" ]; then
-          echo "  Scene $N rendered: $FOUND_PATH"
-          RENDER_SUCCESS=true
-        fi
-      fi
-
-      rm -f "$RENDER_LOG"
-      if $RENDER_SUCCESS; then
-        # Capture last-frame PNG
-        manim render -ql -s --renderer=cairo --disable_caching \
-          ".manimate/scenes/${SCENE_FILE}.py" "$SCENE_CLASS" 2>/dev/null || true
-        LASTFRAME=$(find .manimate/media/images -name "*.png" -newer "$FILE" 2>/dev/null | head -1)
-        if [ -n "$LASTFRAME" ]; then
-          cp "$LASTFRAME" ".manimate/lastframes/scene_$(printf "%02d" $N).png"
-        fi
-        break
-      fi
-    else
-      RENDER_EXIT=$?
-      cd ..
-    fi
-
-    RETRY=$((RETRY + 1))
-    ERROR_OUTPUT="$(cat "$RENDER_LOG")"
-    rm -f "$RENDER_LOG"
-
-    if [ $RETRY -ge $MAX_RETRIES ]; then
-      echo "  Scene $N failed after $MAX_RETRIES attempts"
-      break
-    fi
-
-    echo "  Render failed (attempt $RETRY/$MAX_RETRIES). Fixing..."
-
-    CURRENT_CODE="$(cat "$FILE")"
-
-    cat > /tmp/manimate-fix-$(printf "%02d" $N)-prompt.txt << FIX_EOF
-Fix this Manim scene. The render failed with the following error:
-
-## Error Output
-\`\`\`
-$ERROR_OUTPUT
-\`\`\`
-
-## Current Code
-\`\`\`python
-$CURRENT_CODE
-\`\`\`
-
-## Common Errors Reference
-$COMMON_ERRORS
-
-## Rules
-1. Use \`from manim import *\` (NOT manimlib)
-2. The Scene class must be named \`$SCENE_CLASS\`
-3. Fix the error while preserving the animation intent
-4. If LaTeX is failing, switch to Text() as fallback
-5. The file will be rendered with --renderer=cairo (no OpenGL)
-
-Write the corrected Python file to: $FILE
-FIX_EOF
-
-    if [ -n "$TIMEOUT_CMD" ]; then
-      $TIMEOUT_CMD 90 $ENV_CMD $MANIMATE_AGENT_CLI \
-        "$(cat /tmp/manimate-fix-$(printf "%02d" $N)-prompt.txt)"
-    else
-      $ENV_CMD $MANIMATE_AGENT_CLI \
-        "$(cat /tmp/manimate-fix-$(printf "%02d" $N)-prompt.txt)"
-    fi
-  done
-done
+cd .manimate && eval $RENDER_CMD 2>"$RENDER_LOG"
+RENDER_EXIT=$?
+cd ..
 ```
+
+**On success**: locate the output MP4:
+
+```bash
+QUALITY_SUBDIR="1080p60"  # matches -qh
+EXPECTED_PATH=".manimate/media/videos/${SCENE_FILE}/${QUALITY_SUBDIR}/${SCENE_CLASS}.mp4"
+if [ ! -f "$EXPECTED_PATH" ]; then
+  FOUND_PATH=$(find .manimate/media/videos -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
+fi
+```
+
+Then capture a last-frame PNG for visual validation:
+
+```bash
+manim render -ql -s --renderer=cairo --disable_caching \
+  ".manimate/scenes/${SCENE_FILE}.py" "$SCENE_CLASS" 2>/dev/null || true
+LASTFRAME=$(find .manimate/media/images -name "*.png" -newer ".manimate/scenes/${SCENE_FILE}.py" 2>/dev/null | head -1)
+if [ -n "$LASTFRAME" ]; then
+  cp "$LASTFRAME" ".manimate/lastframes/scene_$(printf "%02d" $N).png"
+fi
+```
+
+**On failure (up to 3 retries):**
+
+1. Read the render error output from the log file
+2. Read the current scene file and `library/common-errors.md`
+3. Fix the scene file directly — preserve the animation intent, fix the error, ensure the Scene class name stays `{scene_class}`
+4. If LaTeX is failing, switch to Text() as fallback
+5. Re-run the render command
 
 ---
 
@@ -578,13 +362,15 @@ done
 Run the render script to concatenate scene videos and convert to GIF:
 
 ```bash
-bash "$SKILL_DIR/scripts/render.sh" \
+bash "scripts/render.sh" \
   --scenes-dir .manimate/scenes \
   --media-dir .manimate/media \
   --output-dir .manimate/output \
   --format "$FORMAT" \
   --story-file .manimate/story.json
 ```
+
+> `scripts/render.sh` is relative to the skill directory. `$FORMAT` comes from `.manimate/params.json`.
 
 ---
 
@@ -661,7 +447,7 @@ If the user accepts, re-run Steps 5-6 for the failed scenes only, then re-stitch
 
 ## Component Library Reference
 
-When generating scenes, the dispatcher reads these files and injects their contents into worker prompts:
+Read these library files before writing each scene (see Step 5 for which files apply per scene type):
 
 | File | Purpose | Used by |
 |------|---------|---------|
@@ -675,11 +461,10 @@ When generating scenes, the dispatcher reads these files and injects their conte
 
 1. **ManimCE only** — `from manim import *` (never `manimlib`). Cairo renderer for headless safety.
 2. **One Scene class per file** — each scene is a separate `.py` file for isolated error recovery.
-3. **Sequential generation** — workers run one at a time for V1. Simpler to debug.
-4. **Shared style via story.json** — colors, font sizes, and background injected into every worker prompt for consistency.
-5. **LaTeX fallback** — if LaTeX is unavailable, workers use `Text()` instead of `MathTex()`.
-6. **Timeout wrappers** — 120s for generation, 180s for render, 90s for fix workers.
-7. **Error recovery** — render failures are parsed and fed back to fix workers. Max 3 retries per scene.
-8. **Selective library injection** — only relevant docs per scene type to keep prompts focused.
-9. **Generation tier for creation, review tier for QC** — use your agent's most capable model for generation.
-10. **SVG-forward visuals** — for real-world concepts (servers, users, databases, etc.), workers generate custom inline SVG icons instead of basic shapes. This is manimate's key visual differentiator.
+3. **Inline generation** — the orchestrating agent writes scene files directly (no sub-processes), ensuring the user's chosen model is used throughout.
+4. **Shared style via story.json** — colors, font sizes, and background are defined once and referenced by every scene for consistency.
+5. **LaTeX fallback** — if LaTeX is unavailable, use `Text()` instead of `MathTex()`.
+6. **Render timeout** — 180s timeout on render commands to catch hangs.
+7. **Error recovery** — on render failure, read the error, fix the scene file, and retry. Max 3 attempts per scene.
+8. **Selective library reads** — only read library docs relevant to the scene type to stay focused.
+9. **SVG-forward visuals** — for real-world concepts (servers, users, databases, etc.), generate custom inline SVG icons instead of basic shapes. This is manimate's key visual differentiator.
