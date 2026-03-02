@@ -172,8 +172,8 @@ Write `.manimate/story.json` with a top-level `asset_manifest` and per-scene `sv
     "negative_color": "#ff4444",
     "text_color": "#ffffff",
     "muted_color": "#8a8aaa",
-    "font_heading": "Galvji",
-    "font_body": "Avenir Next",
+    "font_heading": "Helvetica Neue",
+    "font_body": "Helvetica Neue",
     "font_code": "Monaco",
     "font_size_title": 44,
     "font_size_body": 26
@@ -330,7 +330,7 @@ def title_card(scene, text, wait=1.5):
     Returns:
         title Mobject (now in the UL corner at scale 0.55)
     """
-    title = Text(text, font="Galvji", font_size=44, color=TEXT_CLR, weight=BOLD)
+    title = Text(text, font="Helvetica Neue", font_size=44, color=TEXT_CLR, weight=BOLD)
     underline = Line(
         title.get_left() + DOWN * 0.35,
         title.get_right() + DOWN * 0.35,
@@ -354,7 +354,7 @@ def make_node(label, color=None, w=2.5, h=0.8):
     """Create a labeled rounded rectangle node. Box auto-sizes to fit text."""
     if color is None:
         color = PRIMARY
-    text = Text(label, font="Avenir Next", font_size=22, color=TEXT_CLR)
+    text = Text(label, font="Helvetica Neue", font_size=22, color=TEXT_CLR)
     box_w = max(w, text.width + 0.6)
     box_h = max(h, text.height + 0.4)
     box = RoundedRectangle(
@@ -487,7 +487,7 @@ from shared import *
 class AssetValidation(Scene):
     def construct(self):
         setup_scene(self)
-        title = Text("Asset Validation", font="Galvji", font_size=32,
+        title = Text("Asset Validation", font="Helvetica Neue", font_size=32,
                       color=TEXT_CLR, weight=BOLD)
         title.to_edge(UP, buff=0.5)
         self.add(title)

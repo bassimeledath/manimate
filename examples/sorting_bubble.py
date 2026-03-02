@@ -36,7 +36,7 @@ class BubbleSortIntro(Scene):
 
         desc = Text(
             "Compare adjacent pairs, swap if needed",
-            font="Avenir Next", font_size=26, color=TEXT_CLR,
+            font="Helvetica Neue", font_size=26, color=TEXT_CLR,
         )
         desc.next_to(chart, DOWN, buff=0.8)
         self.play(FadeIn(desc, shift=UP * 0.3), run_time=0.4)

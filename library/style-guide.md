@@ -116,16 +116,16 @@ self.remove(flash)
 ### Fonts
 | Role | Font | Usage |
 |------|------|-------|
-| Headings | `font="Galvji"` | Titles, scene headers, bold text |
-| Body | `font="Avenir Next"` | Primary content, descriptions, labels |
+| Headings | `font="Helvetica Neue"` | Titles, scene headers, bold text (`weight=BOLD`) |
+| Body | `font="Helvetica Neue"` | Primary content, descriptions, labels |
 | Code | `font="Monaco"` | Code snippets, technical text, monospace |
 
 ```python
 # Heading
-title = Text("Scene Title", font="Galvji", font_size=44, color=TEXT_CLR, weight=BOLD)
+title = Text("Scene Title", font="Helvetica Neue", font_size=44, color=TEXT_CLR, weight=BOLD)
 
 # Body text
-body = Text("This explains the concept", font="Avenir Next", font_size=26, color=TEXT_CLR)
+body = Text("This explains the concept", font="Helvetica Neue", font_size=26, color=TEXT_CLR)
 
 # Code/technical
 code_text = Text("def hello():", font="Monaco", font_size=22, color=ACCENT)
@@ -150,7 +150,7 @@ Titles get a thin PRIMARY-colored underline that grows from center. This is the 
 
 ```python
 # Title with signature underline
-title = Text("Scene Title", font="Galvji", font_size=44, color=TEXT_CLR, weight=BOLD)
+title = Text("Scene Title", font="Helvetica Neue", font_size=44, color=TEXT_CLR, weight=BOLD)
 underline = Line(
     title.get_left() + DOWN * 0.35,
     title.get_right() + DOWN * 0.35,
@@ -188,7 +188,7 @@ def title_card(scene, text, wait=1.5):
     Returns:
         title Mobject (now in the UL corner at scale 0.55)
     """
-    title = Text(text, font="Galvji", font_size=44, color=TEXT_CLR, weight=BOLD)
+    title = Text(text, font="Helvetica Neue", font_size=44, color=TEXT_CLR, weight=BOLD)
     underline = Line(
         title.get_left() + DOWN * 0.35,
         title.get_right() + DOWN * 0.35,
@@ -276,7 +276,7 @@ arrow = Arrow(left_panel.get_right(), right_panel.get_left(),
 
 ```python
 # GOOD: group → arrange → position
-node_label = Text("API", font="Avenir Next", font_size=20, color=TEXT_CLR)
+node_label = Text("API", font="Helvetica Neue", font_size=20, color=TEXT_CLR)
 node_box = RoundedRectangle(corner_radius=0.15, width=2.2, height=0.8,
                             fill_color=SURFACE, fill_opacity=1,
                             stroke_color=PRIMARY, stroke_width=1.5)
@@ -433,7 +433,7 @@ def make_node(label, color=None, w=2.5, h=0.8):
     """Create a labeled rounded rectangle node. Box auto-sizes to fit text."""
     if color is None:
         color = PRIMARY
-    text = Text(label, font="Avenir Next", font_size=22, color=TEXT_CLR)
+    text = Text(label, font="Helvetica Neue", font_size=22, color=TEXT_CLR)
     box_w = max(w, text.width + 0.6)
     box_h = max(h, text.height + 0.4)
     box = RoundedRectangle(
@@ -630,7 +630,7 @@ class TitleCard(Scene):
         # Subtitle (font_size 24 → TEXT_CLR, not TEXT_DIM)
         subtitle = Text(
             "Finding elements in sorted data, fast.",
-            font="Avenir Next", font_size=24, color=TEXT_CLR,
+            font="Helvetica Neue", font_size=24, color=TEXT_CLR,
         )
         subtitle.next_to(title, DOWN, buff=0.4)
         self.play(FadeIn(subtitle, shift=UP * 0.2), run_time=0.3)
@@ -688,7 +688,7 @@ class DiagramExample(Scene):
         # Caption label (font_size 16 → TEXT_DIM is fine)
         label = Text(
             "processes the request",
-            font="Avenir Next", font_size=16, color=TEXT_DIM,
+            font="Helvetica Neue", font_size=16, color=TEXT_DIM,
         )
         label.next_to(service, DOWN, buff=0.4)
         self.play(FadeIn(label, shift=UP * 0.2), run_time=0.3)
@@ -715,7 +715,7 @@ class EquationExample(Scene):
 
         # Section tag (font_size 16 → TEXT_DIM-eligible, but tags use PRIMARY)
         tag = Text(
-            "DERIVATION", font="Galvji", font_size=16,
+            "DERIVATION", font="Helvetica Neue", font_size=16,
             color=PRIMARY, weight=BOLD,
         )
         tag.to_corner(UL, buff=0.5)
@@ -723,7 +723,7 @@ class EquationExample(Scene):
 
         # Title below the tag
         title = Text(
-            "Euler's Identity", font="Galvji", font_size=40,
+            "Euler's Identity", font="Helvetica Neue", font_size=40,
             color=TEXT_CLR, weight=BOLD,
         )
         title.next_to(tag, DOWN, buff=0.15, aligned_edge=LEFT)
@@ -765,7 +765,7 @@ class EquationExample(Scene):
         # Annotation (font_size 20 → TEXT_CLR, not TEXT_DIM)
         desc = Text(
             "Five fundamental constants in one equation.",
-            font="Avenir Next", font_size=20, color=TEXT_CLR,
+            font="Helvetica Neue", font_size=20, color=TEXT_CLR,
         )
         desc.next_to(card, DOWN, buff=0.5)
         self.play(FadeIn(desc, shift=UP * 0.2), run_time=0.3)
@@ -841,7 +841,7 @@ SVG fills and strokes must use the Creative Chaos palette hex values — never r
 | `Indicate(obj)` for emphasis | Pop pattern (scale up + settle) |
 | `background_color = "#1e1e2e"` | `background_color = BG` (use the token) |
 | `font_size=48` for everything | Use the size scale: 44/32/26/20/16 |
-| No `font` parameter | `font="Galvji"` for headings, `font="Avenir Next"` for body |
+| No `font` parameter | `font="Helvetica Neue"` for all text (headings use `weight=BOLD`) |
 | Sharp-cornered `SurroundingRectangle` | `RoundedRectangle` positioned with `move_to` |
 | 4+ accent colors on screen | Max 3 accents. Dim or remove before adding more |
 | `run_time=2` for simple transforms | `run_time=0.5-0.6` — keep it snappy |

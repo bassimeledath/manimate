@@ -35,7 +35,7 @@ class BinarySearchIntro(Scene):
         self.wait(1)
 
         # Target
-        target_label = Text("Find: 23", font="Avenir Next", font_size=26, color=HIGHLIGHT)
+        target_label = Text("Find: 23", font="Helvetica Neue", font_size=26, color=HIGHLIGHT)
         target_label.next_to(array, DOWN, buff=0.8)
         self.play(FadeIn(target_label, shift=UP * 0.3), run_time=0.4)
         self.wait(tw("Find: 23"))
@@ -98,7 +98,7 @@ class BinarySearchAlgorithm(Scene):
 
             if values[mid] == target:
                 self.play(boxes[mid].animate.set_fill(SUCCESS, opacity=0.5), run_time=0.3)
-                found = Text("Found!", font="Galvji", font_size=32, color=SUCCESS, weight=BOLD)
+                found = Text("Found!", font="Helvetica Neue", font_size=32, color=SUCCESS, weight=BOLD)
                 found.next_to(boxes[mid], UP, buff=1.2)
                 self.play(FadeIn(found, shift=UP * 0.4), run_time=0.5)
                 self.wait(2)

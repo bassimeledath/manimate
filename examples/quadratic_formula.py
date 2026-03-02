@@ -26,7 +26,7 @@ class QuadraticSetup(Scene):
 
         desc = Text(
             "We want to solve for x",
-            font="Avenir Next", font_size=26, color=TEXT_CLR,
+            font="Helvetica Neue", font_size=26, color=TEXT_CLR,
         )
         desc.next_to(card, DOWN, buff=0.5)
         self.play(FadeIn(desc, shift=UP * 0.3), run_time=0.4)

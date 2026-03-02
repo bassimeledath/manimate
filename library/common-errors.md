@@ -85,16 +85,15 @@ GOOD: Text(f"> {command}")                 # "> /manimate ..."
 ```
 Always double-check string literals for missing spaces, especially in f-strings and concatenations. Preview the string value mentally before passing to Text().
 
-## 16. Font kerning issues at small sizes
-Manim's Cairo renderer can produce subtle character-spacing artifacts with certain fonts, especially "Avenir Next" at font_size <= 20. If text looks oddly spaced:
+## 16. Font kerning issues (AAT vs GPOS)
+Pango/Cairo ignores AAT kerning tables (used by Apple system fonts like Galvji and Avenir Next), producing uneven character spacing. Helvetica Neue uses GPOS kerning which Pango reads correctly — this is why we standardized on it. If you see irregular spacing with a different font, check whether it uses AAT or GPOS kerning.
 ```
-# Option 1: Use Monaco for technical text (monospace = consistent spacing)
-label = Text("access_token", font="Monaco", font_size=16, color=TEXT_DIM)
+# Helvetica Neue works correctly at all sizes
+label = Text("Access granted", font="Helvetica Neue", font_size=20, color=TEXT_CLR)
 
-# Option 2: Use slightly larger font size
-label = Text("Access granted", font="Avenir Next", font_size=22, color=TEXT_CLR)
+# Monaco (monospace) is also fine for technical text
+label = Text("access_token", font="Monaco", font_size=16, color=TEXT_DIM)
 ```
-For critical text that must be pixel-perfect, prefer `font="Monaco"` or increase font_size to 22+.
 
 ## 17. Progress bar fill overflows track
 ```

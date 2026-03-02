@@ -18,7 +18,7 @@ class BasicScene(Scene):
 
         # 2. Main content — replace with your asset_manifest ID
         icon = load_asset("your_asset_id", scale=0.8)
-        label = Text("Server", font="Avenir Next", font_size=20, color=TEXT_CLR)
+        label = Text("Server", font="Helvetica Neue", font_size=20, color=TEXT_CLR)
         label.next_to(icon, DOWN, buff=0.3)
         content = VGroup(icon, label)
         content.move_to(ORIGIN)
