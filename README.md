@@ -1,35 +1,37 @@
-# /animate
+# /manimate
 
 A coding-agent skill that generates diagram and animation videos from natural language prompts using Manim.
 
+![What is an MCP?](public/mcp-example.gif)
+
 ```
-/animate "explain how binary search works"
+/manimate "What is an MCP?"
 ```
 
-Outputs: `.animate/output/animation.mp4` + `.animate/output/animation.gif`
+Outputs: `.manimate/output/animation.mp4` (GIF available on request)
 
 ## Installation
 
 ### Via npx skills (recommended)
 ```bash
-npx skills add bassimeledath/manim-video-maker
+npx skills add bassimeledath/manimate
 ```
 
 ### Via npm
 ```bash
-npx @bassimeledath/animate
+npx @bassimeledath/manimate
 ```
 
 ### Manual
 ```bash
 # Claude Code
-git clone https://github.com/bassimeledath/manim-video-maker ~/.claude/skills/animate
+git clone https://github.com/bassimeledath/manimate ~/.claude/skills/manimate
 
 # Codex
-git clone https://github.com/bassimeledath/manim-video-maker ~/.codex/skills/animate
+git clone https://github.com/bassimeledath/manimate ~/.codex/skills/manimate
 
 # Other agents
-git clone https://github.com/bassimeledath/manim-video-maker ~/.agents/skills/animate
+git clone https://github.com/bassimeledath/manimate ~/.agents/skills/manimate
 ```
 
 ## Dependencies
@@ -38,18 +40,20 @@ git clone https://github.com/bassimeledath/manim-video-maker ~/.agents/skills/an
 - **ManimCE** — `pip install manim`
 - **ffmpeg** — video stitching and GIF conversion
 - **LaTeX** (optional) — for MathTex/Tex. Falls back to Text() if unavailable
-- A supported AI coding agent CLI (`claude`, `codex`, or set `ANIMATE_AGENT_CLI`)
+- A supported AI coding agent CLI (`claude`, `codex`, or set `MANIMATE_AGENT_CLI`)
 
 ## Agent Configuration
 
-Animate auto-detects your agent CLI. Override with:
+Manimate auto-detects your agent CLI. Override with:
 
 ```bash
-export ANIMATE_AGENT_CLI="codex --quiet --full-auto"
-export ANIMATE_AGENT_ENV_UNSET="MY_AGENT_PARENT_SESSION"
+export MANIMATE_AGENT_CLI="codex --quiet --full-auto"
+export MANIMATE_AGENT_ENV_UNSET="MY_AGENT_PARENT_SESSION"
 ```
 
 ## How It Works
+
+<video src="public/pipeline.mp4" autoplay loop muted playsinline></video>
 
 The skill uses Manim (Community Edition) as a real animation rendering engine. The agent writes Python Scene classes, Manim renders them to video.
 
@@ -58,37 +62,38 @@ The skill uses Manim (Community Edition) as a real animation rendering engine. T
 3. **Story decomposition** — breaks the prompt into scenes with visual specs and continuity notes
 4. **Scene generation** — agent writes Python files with Manim Scene classes
 5. **Render + error recovery** — `manim render` produces MP4; failures are auto-corrected (max 3 retries)
-6. **Stitch + convert** — ffmpeg concatenates scenes and converts to GIF
+6. **Stitch + convert** — ffmpeg concatenates scenes into MP4 (GIF conversion only if requested)
 7. **Report** — output paths and sizes
+8. **Visual validation** *(optional)* — agent reads last-frame PNGs and checks text readability, color consistency, layout balance, and animation completeness; offers to regenerate failed scenes
 
 ## Examples
 
 ```
 # Simple (1 scene)
-/animate "show the Pythagorean theorem"
+/manimate "show the Pythagorean theorem"
 
 # Medium (2-3 scenes)
-/animate "explain how binary search works"
+/manimate "explain how binary search works"
 
 # Complex (3-4 scenes)
-/animate "visualize bubble sort step by step with comparisons and swaps"
+/manimate "visualize bubble sort step by step with comparisons and swaps"
 ```
 
 ## Output
 
-Files are written to `.animate/output/` in the current working directory:
+Files are written to `.manimate/output/` in the current working directory:
 
-| File | Format | Typical Size |
-|------|--------|-------------|
-| `animation.mp4` | H.264 MP4 | 0.5-3MB |
-| `animation.gif` | Animated GIF | 1-5MB |
+| File | Format | Typical Size | When |
+|------|--------|-------------|------|
+| `animation.mp4` | H.264 MP4 | 0.5-3MB | Always (default) |
+| `animation.gif` | Animated GIF | 1-5MB | Only when user requests GIF |
 
-Last-frame PNGs for each scene are saved to `.animate/lastframes/`.
+Last-frame PNGs for each scene are saved to `.manimate/lastframes/`.
 
 ## Architecture
 
 ```
-/animate "explain binary search"
+/manimate "explain binary search"
     |
     |- Step 1: Infer parameters (scenes, quality, style)
     |- Step 2: Preflight (python3, manim, ffmpeg, latex?, timeout?)
@@ -98,7 +103,8 @@ Last-frame PNGs for each scene are saved to `.animate/lastframes/`.
     |- Step 5: Render each scene (manim render --renderer=cairo)
     |          Error recovery: parse error -> fix worker -> retry (max 3)
     |- Step 6: Stitch + convert (ffmpeg concat -> MP4 + GIF)
-    '- Step 7: Report output paths
+    |- Step 7: Report output paths
+    '- Step 8: (Optional) Visual validation of last-frame PNGs
 ```
 
 ## Component Library

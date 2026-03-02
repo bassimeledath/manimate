@@ -12,11 +12,11 @@
 set -e
 
 # Defaults
-SCENES_DIR=".animate/scenes"
-MEDIA_DIR=".animate/media"
-OUTPUT_DIR=".animate/output"
-FORMAT="both"
-STORY_FILE=".animate/story.json"
+SCENES_DIR=".manimate/scenes"
+MEDIA_DIR=".manimate/media"
+OUTPUT_DIR=".manimate/output"
+FORMAT="mp4"
+STORY_FILE=".manimate/story.json"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do

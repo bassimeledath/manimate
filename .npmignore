@@ -1,5 +1,5 @@
 .git/
-.animate/
+.manimate/
 __pycache__/
 *.pyc
 .DS_Store

@@ -1,5 +1,5 @@
 node_modules/
-.animate/
+.manimate/
 __pycache__/
 *.pyc
 .DS_Store

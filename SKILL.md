@@ -1,23 +1,23 @@
 ---
-name: animate
-description: Generate diagram and animation videos from natural language descriptions using Manim. Outputs MP4 and GIF.
+name: manimate
+description: Generate diagram and animation videos from natural language descriptions using Manim. Outputs MP4 (default) or GIF on request.
 ---
 
-# /animate — Manim Animation Video Maker
+# /manimate — Manim Animation Video Maker
 
-Generate diagram and animation videos from natural language descriptions using Manim. Outputs MP4 and GIF files.
+Generate diagram and animation videos from natural language descriptions using Manim. Outputs MP4 video by default; GIF available on request.
 
 ## Usage
 
 ```
-/animate "explain how binary search works"
-/animate "show the Pythagorean theorem proof"
-/animate "visualize bubble sort step by step"
+/manimate "explain how binary search works"
+/manimate "show the Pythagorean theorem proof"
+/manimate "visualize bubble sort step by step"
 ```
 
 ## Pipeline
 
-When the user invokes `/animate`, execute these steps in order:
+When the user invokes `/manimate`, execute these steps in order (Steps 1-7 are the core pipeline; Step 8 is an optional visual validation offered after the report):
 
 ---
 
@@ -28,29 +28,29 @@ Parse the user's prompt and infer rendering parameters:
 | Parameter | Range | Default | How to infer |
 |-----------|-------|---------|--------------|
 | `scenes` | 1-6 | 2 | Count distinct concepts/steps/phases in the prompt |
-| `quality` | l/m/h | m | Default medium; use high for math-heavy or final delivery |
-| `format` | gif/mp4/both | both | Default both unless user specifies |
+| `quality` | l/m/h | h | Default high; use medium for quick drafts |
+| `format` | gif/mp4/both | mp4 | Default mp4; use gif or both only if user explicitly requests GIF |
 | `style` | educational/minimal/cinematic | educational | Infer from the tone/subject |
 | `duration_per_scene` | 5-15s | 8 | Longer for complex concepts, shorter for simple transitions |
 
-Write to `.animate/params.json`:
+Write to `.manimate/params.json`:
 
 ```json
 {
   "prompt": "explain how binary search works",
   "scenes": 3,
-  "quality": "m",
-  "format": "both",
+  "quality": "h",
+  "format": "mp4",
   "style": "educational",
   "duration_per_scene": 8
 }
 ```
 
-Write `.animate/manim.cfg`:
+Write `.manimate/manim.cfg`:
 
 ```ini
 [CLI]
-quality = medium_quality
+quality = high_quality
 format = mp4
 renderer = cairo
 disable_caching = True
@@ -93,20 +93,20 @@ else
 fi
 
 # Detect agent CLI
-ANIMATE_AGENT_CLI="${ANIMATE_AGENT_CLI:-}"
-if [ -z "$ANIMATE_AGENT_CLI" ]; then
+MANIMATE_AGENT_CLI="${MANIMATE_AGENT_CLI:-}"
+if [ -z "$MANIMATE_AGENT_CLI" ]; then
   if command -v claude >/dev/null 2>&1; then
-    ANIMATE_AGENT_CLI="claude -p --dangerously-skip-permissions"
-    ANIMATE_AGENT_ENV_UNSET="CLAUDE_CODE_ENTRYPOINT,CLAUDECODE"
+    MANIMATE_AGENT_CLI="claude -p --dangerously-skip-permissions"
+    MANIMATE_AGENT_ENV_UNSET="CLAUDE_CODE_ENTRYPOINT,CLAUDECODE"
   elif command -v codex >/dev/null 2>&1; then
-    ANIMATE_AGENT_CLI="codex --quiet --full-auto"
-    ANIMATE_AGENT_ENV_UNSET=""
+    MANIMATE_AGENT_CLI="codex --quiet --full-auto"
+    MANIMATE_AGENT_ENV_UNSET=""
   else
-    echo "No supported agent CLI found. Set ANIMATE_AGENT_CLI env var."
+    echo "No supported agent CLI found. Set MANIMATE_AGENT_CLI env var."
     exit 1
   fi
 fi
-AGENT_BIN=$(echo "$ANIMATE_AGENT_CLI" | awk '{print $1}')
+AGENT_BIN=$(echo "$MANIMATE_AGENT_CLI" | awk '{print $1}')
 command -v "$AGENT_BIN" >/dev/null 2>&1 || { echo "Agent CLI '$AGENT_BIN' not found"; exit 1; }
 
 # Detect timeout command
@@ -123,8 +123,8 @@ fi
 Create working directory:
 
 ```bash
-rm -rf .animate
-mkdir -p .animate/scenes .animate/lastframes .animate/output
+rm -rf .manimate
+mkdir -p .manimate/scenes .manimate/lastframes .manimate/output
 ```
 
 > **Pipeline-wide LATEX_AVAILABLE flag**: When `false`, worker prompts explicitly instruct the agent: "Do NOT use MathTex or Tex — use Text() for all text, including math expressions. Render equations as Unicode or ASCII."
@@ -135,7 +135,15 @@ mkdir -p .animate/scenes .animate/lastframes .animate/output
 
 Break the prompt into scenes. Each scene specifies visual elements, animations, and narrative arc.
 
-Write `.animate/story.json`:
+Think about what real-world concepts in the prompt can be represented as **custom SVG icons** vs basic Manim shapes. Apply this rule of thumb: **if a human would draw a recognizable icon for the concept, specify an SVG — if it's abstract or structural, use native shapes.**
+
+Prefer custom SVG icons for: servers, databases, users/people, documents, locks/keys, shields, clouds, devices (phones, laptops), brains/AI, gears, rockets, envelopes, globes, checkmarks, warnings, error/denied symbols.
+
+Use basic Manim shapes only for: array cells, flowchart boxes, graphs/axes, code blocks, bullets/dots, containers, math expressions.
+
+Each scene spec should include an `svg_assets` field listing the custom SVG icons the scene needs. This tells workers which concepts deserve custom illustrations.
+
+Write `.manimate/story.json`:
 
 ```json
 {
@@ -147,29 +155,52 @@ Write `.animate/story.json`:
       "description": "Show a sorted array of numbers. Highlight that we need to find a target value.",
       "visual_elements": ["sorted array of boxes with numbers", "target value highlighted"],
       "animations": ["Create array", "Highlight target", "Write question text"],
+      "svg_assets": [],
       "scene_class": "TheProblem",
       "duration": 8,
       "template": "basic",
+      "text_elements": ["title: 3 words", "description: 12 words"],
+      "estimated_reading_pauses": 6.0,
       "continuity_in": null,
       "continuity_out": "Array remains visible, target highlighted"
     }
   ],
   "shared_style": {
-    "background_color": "#1e1e2e",
-    "accent_color": "BLUE",
-    "highlight_color": "YELLOW",
-    "text_color": "WHITE",
-    "font_size_title": 48,
-    "font_size_body": 32
+    "background_color": "#2a2a3a",
+    "primary_color": "#ff3366",
+    "accent_color": "#33ccff",
+    "highlight_color": "#ffcc00",
+    "success_color": "#66ff66",
+    "text_color": "#ffffff",
+    "muted_color": "#6a6a8a",
+    "font_heading": "Galvji",
+    "font_body": "Avenir Next",
+    "font_code": "Monaco",
+    "font_size_title": 44,
+    "font_size_body": 26
   },
   "latex_available": true
 }
+```
+
+**Example `svg_assets` for an API authentication scene:**
+```json
+"svg_assets": ["user_icon", "server_icon", "lock_icon", "key_icon", "shield_icon"]
+```
+
+Workers will generate the actual SVG strings inline based on these asset names — they are hints, not file references.
 ```
 
 **Continuity rules:**
 - `continuity_out` of scene N must match `continuity_in` of scene N+1
 - Shared visual elements should use identical styling constants
 - Color palette must be consistent across all scenes (defined in `shared_style`)
+
+**Pacing rules:**
+- `text_elements` lists each text block with its approximate word count — used by workers to calculate reading pauses
+- `estimated_reading_pauses` is the total seconds of `self.wait()` needed for reading time (sum of `max(2, words / 3)` for each text block)
+- `duration` must be >= animation time + `estimated_reading_pauses` — increase duration if needed to fit reading time
+- Workers use the formula: **`self.wait(max(2, word_count / 3))`** after every text appearance
 
 ---
 
@@ -184,6 +215,7 @@ For each scene, spawn a worker using the agent CLI. Workers run **sequentially**
 | Scene template | Always injected | Conditionally injected |
 |---------------|-----------------|----------------------|
 | All types | `cheatsheet.md`, `style-guide.md`, `common-errors.md` | — |
+| All types (if scene has `svg_assets`) | `svg-icons.md` | — |
 | `basic` | — | `animations.md` |
 | `math` | — | `text-and-math.md`, `animations.md` |
 | `graph` | — | `animations.md` |
@@ -201,10 +233,23 @@ CHEATSHEET="$(cat "$SKILL_DIR/library/cheatsheet.md")"
 STYLE_GUIDE="$(cat "$SKILL_DIR/library/style-guide.md")"
 COMMON_ERRORS="$(cat "$SKILL_DIR/library/common-errors.md")"
 
+# SVG icons reference — injected when scene has svg_assets
+HAS_SVG_ASSETS=$(python3 -c "
+import json
+story = json.load(open('.manimate/story.json'))
+assets = story['scenes'][$((N-1))].get('svg_assets', [])
+print('yes' if assets else 'no')
+")
+SVG_ICONS_REF=""
+if [ "$HAS_SVG_ASSETS" = "yes" ]; then
+  SVG_ICONS_REF="### SVG Icons Reference
+$(cat "$SKILL_DIR/library/svg-icons.md")"
+fi
+
 # Read scene metadata
 SCENE_TEMPLATE_NAME=$(python3 -c "
 import json
-story = json.load(open('.animate/story.json'))
+story = json.load(open('.manimate/story.json'))
 scene = story['scenes'][$((N-1))]
 print(scene.get('template', 'basic'))
 ")
@@ -239,7 +284,7 @@ TEMPLATE="$(cat "$SKILL_DIR/templates/${SCENE_TEMPLATE_NAME}.py")"
 # Read scene spec + shared style + latex flag
 SCENE_SPEC=$(python3 -c "
 import json
-story = json.load(open('.animate/story.json'))
+story = json.load(open('.manimate/story.json'))
 scene = story['scenes'][$((N-1))]
 scene['shared_style'] = story['shared_style']
 scene['latex_available'] = story.get('latex_available', False)
@@ -248,13 +293,13 @@ print(json.dumps(scene, indent=2))
 
 SCENE_CLASS=$(python3 -c "
 import json
-story = json.load(open('.animate/story.json'))
+story = json.load(open('.manimate/story.json'))
 print(story['scenes'][$((N-1))]['scene_class'])
 ")
 
 DURATION=$(python3 -c "
 import json
-story = json.load(open('.animate/story.json'))
+story = json.load(open('.manimate/story.json'))
 print(story['scenes'][$((N-1))].get('duration', 8))
 ")
 
@@ -266,7 +311,7 @@ else
   LATEX_RULE="11. If LaTeX is needed, use MathTex (not Tex) for math expressions"
 fi
 
-cat > /tmp/animate-scene-$(printf "%02d" $N)-prompt.txt << PROMPT_EOF
+cat > /tmp/manimate-scene-$(printf "%02d" $N)-prompt.txt << PROMPT_EOF
 You are generating a Python file for a Manim animation scene.
 
 ## Scene Specification
@@ -287,6 +332,8 @@ $STYLE_GUIDE
 
 $EXTRA_REFS
 
+$SVG_ICONS_REF
+
 ### Common Errors to Avoid
 $COMMON_ERRORS
 
@@ -303,10 +350,33 @@ $COMMON_ERRORS
 9. Use .animate syntax for simple property changes
 10. Use Transform/ReplacementTransform for morphing between objects
 $LATEX_RULE
+12. For real-world concepts (servers, databases, users, documents, locks, etc.), generate a custom SVG icon instead of using a basic rectangle or circle. Use the svg_icon() helper and follow SVG rules from the reference docs. SVGs must use flat colors only — NO gradients, NO filters, NO <text> elements, NO stroke-dasharray. Use Manim Text() for all labels.
+13. Define SVG strings as Python string constants at the top of the scene, write them via the svg_icon() helper. Keep SVGs simple with viewBox="0 0 80 100" or similar. Use colors from the shared_style palette.
+
+## Text Pacing Rules (CRITICAL — text must be readable)
+
+Every text element MUST stay on screen long enough to read. Apply these rules:
+
+14. After EVERY Write(text) or FadeIn(text), add a reading pause:
+    \`\`\`python
+    self.wait(max(2, len("your text content".split()) / 3))
+    \`\`\`
+    This gives ~180 WPM reading speed with a 2-second minimum.
+
+15. Title cards: display for at least 2 seconds before animating to corner/top
+16. Key insight or annotation text: minimum 3 seconds on screen
+17. NEVER use bare \`self.wait()\` after text — always calculate from word count
+18. NEVER use \`self.wait(0.5)\` or \`self.wait(1)\` after text that has more than 3 words
+19. Between conceptual sections, use \`self.wait(1.5)\` as a transition pause
+
+Examples:
+- Title "The Problem" (2 words) → \`self.wait(2)\` (minimum floor)
+- "We need to find the target value in this sorted array" (11 words) → \`self.wait(max(2, 11/3))\` = \`self.wait(3.7)\`
+- "Binary search eliminates half the remaining elements each step by comparing the target to the middle element" (16 words) → \`self.wait(max(2, 16/3))\` = \`self.wait(5.3)\`
 
 ## Output
 
-Write ONLY the Python file to: .animate/scenes/scene_$(printf "%02d" $N).py
+Write ONLY the Python file to: .manimate/scenes/scene_$(printf "%02d" $N).py
 No explanation, no markdown — just the Python file.
 PROMPT_EOF
 ```
@@ -315,8 +385,8 @@ PROMPT_EOF
 
 ```bash
 ENV_CMD="env"
-if [ -n "$ANIMATE_AGENT_ENV_UNSET" ]; then
-  IFS=',' read -ra UNSET_VARS <<< "$ANIMATE_AGENT_ENV_UNSET"
+if [ -n "$MANIMATE_AGENT_ENV_UNSET" ]; then
+  IFS=',' read -ra UNSET_VARS <<< "$MANIMATE_AGENT_ENV_UNSET"
   for var in "${UNSET_VARS[@]}"; do
     [ -n "$var" ] && ENV_CMD="$ENV_CMD -u $var"
   done
@@ -324,18 +394,18 @@ fi
 
 # 120s timeout for generation worker
 if [ -n "$TIMEOUT_CMD" ]; then
-  $TIMEOUT_CMD 120 $ENV_CMD $ANIMATE_AGENT_CLI \
-    "$(cat /tmp/animate-scene-$(printf "%02d" $N)-prompt.txt)"
+  $TIMEOUT_CMD 120 $ENV_CMD $MANIMATE_AGENT_CLI \
+    "$(cat /tmp/manimate-scene-$(printf "%02d" $N)-prompt.txt)"
 else
-  $ENV_CMD $ANIMATE_AGENT_CLI \
-    "$(cat /tmp/animate-scene-$(printf "%02d" $N)-prompt.txt)"
+  $ENV_CMD $MANIMATE_AGENT_CLI \
+    "$(cat /tmp/manimate-scene-$(printf "%02d" $N)-prompt.txt)"
 fi
 ```
 
 3. Validate the generated file:
 
 ```bash
-FILE=".animate/scenes/scene_$(printf "%02d" $N).py"
+FILE=".manimate/scenes/scene_$(printf "%02d" $N).py"
 
 if [ ! -f "$FILE" ]; then
   echo "Missing: $FILE"
@@ -367,14 +437,14 @@ For each scene, render with Manim. If rendering fails, feed the error back to a 
 
 ```bash
 MAX_RETRIES=3
-QUALITY_SUBDIR="720p30"  # matches -qm
+QUALITY_SUBDIR="1080p60"  # matches -qh
 
 for N in $(seq 1 $TOTAL_SCENES); do
-  FILE=".animate/scenes/scene_$(printf "%02d" $N).py"
+  FILE=".manimate/scenes/scene_$(printf "%02d" $N).py"
   SCENE_FILE="scene_$(printf "%02d" $N)"
   SCENE_CLASS=$(python3 -c "
 import json
-story = json.load(open('.animate/story.json'))
+story = json.load(open('.manimate/story.json'))
 print(story['scenes'][$((N-1))]['scene_class'])
   ")
 
@@ -386,21 +456,21 @@ print(story['scenes'][$((N-1))]['scene_class'])
 
     RENDER_LOG=$(mktemp)
     RENDER_CMD="manim render scenes/${SCENE_FILE}.py $SCENE_CLASS \
-        --renderer=cairo -qm --format=mp4 --disable_caching"
+        --renderer=cairo -qh --format=mp4 --disable_caching"
 
     if [ -n "$TIMEOUT_CMD" ]; then
       RENDER_CMD="$TIMEOUT_CMD 180 $RENDER_CMD"
     fi
 
-    if cd .animate && eval $RENDER_CMD 2>"$RENDER_LOG"; then
+    if cd .manimate && eval $RENDER_CMD 2>"$RENDER_LOG"; then
       cd ..
 
-      EXPECTED_PATH=".animate/media/videos/${SCENE_FILE}/${QUALITY_SUBDIR}/${SCENE_CLASS}.mp4"
+      EXPECTED_PATH=".manimate/media/videos/${SCENE_FILE}/${QUALITY_SUBDIR}/${SCENE_CLASS}.mp4"
       if [ -f "$EXPECTED_PATH" ]; then
         echo "  Scene $N rendered: $EXPECTED_PATH"
         RENDER_SUCCESS=true
       else
-        FOUND_PATH=$(find .animate/media/videos -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
+        FOUND_PATH=$(find .manimate/media/videos -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
         if [ -n "$FOUND_PATH" ]; then
           echo "  Scene $N rendered: $FOUND_PATH"
           RENDER_SUCCESS=true
@@ -411,10 +481,10 @@ print(story['scenes'][$((N-1))]['scene_class'])
       if $RENDER_SUCCESS; then
         # Capture last-frame PNG
         manim render -ql -s --renderer=cairo --disable_caching \
-          ".animate/scenes/${SCENE_FILE}.py" "$SCENE_CLASS" 2>/dev/null || true
-        LASTFRAME=$(find .animate/media/images -name "*.png" -newer "$FILE" 2>/dev/null | head -1)
+          ".manimate/scenes/${SCENE_FILE}.py" "$SCENE_CLASS" 2>/dev/null || true
+        LASTFRAME=$(find .manimate/media/images -name "*.png" -newer "$FILE" 2>/dev/null | head -1)
         if [ -n "$LASTFRAME" ]; then
-          cp "$LASTFRAME" ".animate/lastframes/scene_$(printf "%02d" $N).png"
+          cp "$LASTFRAME" ".manimate/lastframes/scene_$(printf "%02d" $N).png"
         fi
         break
       fi
@@ -436,7 +506,7 @@ print(story['scenes'][$((N-1))]['scene_class'])
 
     CURRENT_CODE="$(cat "$FILE")"
 
-    cat > /tmp/animate-fix-$(printf "%02d" $N)-prompt.txt << FIX_EOF
+    cat > /tmp/manimate-fix-$(printf "%02d" $N)-prompt.txt << FIX_EOF
 Fix this Manim scene. The render failed with the following error:
 
 ## Error Output
@@ -463,11 +533,11 @@ Write the corrected Python file to: $FILE
 FIX_EOF
 
     if [ -n "$TIMEOUT_CMD" ]; then
-      $TIMEOUT_CMD 90 $ENV_CMD $ANIMATE_AGENT_CLI \
-        "$(cat /tmp/animate-fix-$(printf "%02d" $N)-prompt.txt)"
+      $TIMEOUT_CMD 90 $ENV_CMD $MANIMATE_AGENT_CLI \
+        "$(cat /tmp/manimate-fix-$(printf "%02d" $N)-prompt.txt)"
     else
-      $ENV_CMD $ANIMATE_AGENT_CLI \
-        "$(cat /tmp/animate-fix-$(printf "%02d" $N)-prompt.txt)"
+      $ENV_CMD $MANIMATE_AGENT_CLI \
+        "$(cat /tmp/manimate-fix-$(printf "%02d" $N)-prompt.txt)"
     fi
   done
 done
@@ -481,11 +551,11 @@ Run the render script to concatenate scene videos and convert to GIF:
 
 ```bash
 bash "$SKILL_DIR/scripts/render.sh" \
-  --scenes-dir .animate/scenes \
-  --media-dir .animate/media \
-  --output-dir .animate/output \
+  --scenes-dir .manimate/scenes \
+  --media-dir .manimate/media \
+  --output-dir .manimate/output \
   --format "$FORMAT" \
-  --story-file .animate/story.json
+  --story-file .manimate/story.json
 ```
 
 ---
@@ -498,14 +568,66 @@ Animation complete!
 Prompt: "explain how binary search works"
 Scenes: 3 (all rendered successfully)
 Duration: 28s (8s + 12s + 8s)
-Quality: 720p @ 30fps
+Quality: 1080p @ 60fps
 Renderer: cairo
 
 Output:
-  MP4: .animate/output/animation.mp4 (1.2MB)
-  GIF: .animate/output/animation.gif (3.4MB)
-  Last-frame previews: .animate/lastframes/
+  MP4: .manimate/output/animation.mp4 (1.2MB)
+  GIF: .manimate/output/animation.gif (3.4MB)
+  Last-frame previews: .manimate/lastframes/
 ```
+
+---
+
+### Step 8: Visual Validation (Optional)
+
+After reporting, ask the user:
+
+```
+Would you like me to validate the animation quality before you see it? (recommended for final delivery)
+```
+
+If the user declines, skip this step entirely. If the user accepts, evaluate each scene's last-frame PNG.
+
+**For each scene, read `.manimate/lastframes/scene_NN.png` and evaluate against this rubric:**
+
+| Criterion | What to check | Pass condition |
+|-----------|--------------|----------------|
+| **Text readability** | All text visible, not cut off, readable size | No text extends beyond frame edges; font size >= 24px equivalent |
+| **Color consistency** | Colors match `shared_style` from story.json | Background, accent, highlight, and text colors match the palette |
+| **Layout balance** | No overlapping elements, nothing off-screen | All Mobjects within frame bounds; no unintended overlap |
+| **Animation completeness** | Final frame shows expected end state | Last frame matches the scene's `description` / `continuity_out` |
+
+**Evaluation process:**
+
+1. Read `.manimate/story.json` to get `shared_style` and each scene's expected end state
+2. For each scene, read the last-frame PNG from `.manimate/lastframes/scene_NN.png`
+3. Evaluate the image against the four rubric criteria
+4. Compile results
+
+**Report format:**
+
+```
+Visual Validation Results:
+
+  Scene 1 (TheProblem): PASS
+  Scene 2 (TheSolution): FAIL
+    - Text readability: title text cut off on right edge
+    - Layout balance: array boxes overlap with subtitle
+  Scene 3 (TheResult): PASS
+
+Summary: 2/3 scenes passed
+```
+
+If any scenes fail, ask:
+
+```
+Scene(s) 2 failed validation. Would you like to regenerate the failed scene(s)?
+```
+
+If the user accepts, re-run Steps 4-5 for the failed scenes only, then re-stitch in Step 6 and re-validate.
+
+> **Note**: This step uses only the agent's built-in image reading capability — no external dependencies required.
 
 ---
 
@@ -517,6 +639,7 @@ When generating scenes, the dispatcher reads these files and injects their conte
 |------|---------|---------|
 | `library/cheatsheet.md` | Manim API quick reference | All scene types |
 | `library/style-guide.md` | Color palette, font sizes, timing | All scene types |
+| `library/svg-icons.md` | SVG icon catalog, helper function, design rules | Scenes with `svg_assets` |
 | `library/animations.md` | Animation patterns with code | basic, math, graph |
 | `library/text-and-math.md` | Text, MathTex, Code patterns | math, code |
 | `library/common-errors.md` | Known pitfalls and fixes | All scene types |
@@ -532,3 +655,4 @@ When generating scenes, the dispatcher reads these files and injects their conte
 7. **Error recovery** — render failures are parsed and fed back to fix workers. Max 3 retries per scene.
 8. **Selective library injection** — only relevant docs per scene type to keep prompts focused.
 9. **Generation tier for creation, review tier for QC** — use your agent's most capable model for generation.
+10. **SVG-forward visuals** — for real-world concepts (servers, users, databases, etc.), workers generate custom inline SVG icons instead of basic shapes. This is manimate's key visual differentiator.

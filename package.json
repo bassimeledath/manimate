@@ -1,7 +1,7 @@
 {
-  "name": "@bassimeledath/animate",
+  "name": "@bassimeledath/manimate",
   "version": "1.0.0",
-  "description": "Generate diagram/animation videos from natural language using Manim. Outputs MP4 and GIF.",
+  "description": "Generate diagram/animation videos from natural language using Manim. Outputs MP4 (default) or GIF on request.",
   "keywords": [
     "claude-code", "skill", "agent-skill", "animation", "manim",
     "video", "codex", "cursor", "ai-coding", "3b1b"
@@ -10,10 +10,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/bassimeledath/manim-video-maker"
+    "url": "https://github.com/bassimeledath/manimate"
   },
   "bin": {
-    "animate-skill": "./bin/install.sh"
+    "manimate-skill": "./bin/install.sh"
   },
   "scripts": {
     "postinstall": "node bin/postinstall.js"

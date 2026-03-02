@@ -2,9 +2,9 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-SKILL_NAME="animate"
+SKILL_NAME="manimate"
 
-echo "Installing animate skill..."
+echo "Installing manimate skill..."
 
 INSTALLED=0
 
@@ -34,8 +34,8 @@ echo "  Linked to generic agents: $AGENTS_DIR"
 INSTALLED=$((INSTALLED + 1))
 
 echo ""
-echo "animate installed! ($INSTALLED agent location(s))"
+echo "manimate installed! ($INSTALLED agent location(s))"
 echo ""
-echo "Usage:  /animate \"explain how binary search works\""
+echo "Usage:  /manimate \"explain how binary search works\""
 echo ""
 echo "Dependencies: python3, manim (pip install manim), ffmpeg"
