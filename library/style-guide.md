@@ -855,3 +855,6 @@ SVG fills and strokes must use the Creative Chaos palette hex values — never r
 | `TEXT_DIM` for body text (font_size >= 20) | `TEXT_CLR` — TEXT_DIM is only for captions (16) and axis labels |
 | Hard-coded box width with text inside | `make_node()` — auto-sizes box to fit text. Or measure: `max(w, text.width + 0.6)` |
 | Animating a raw Rectangle for a progress bar fill | `progress_bar()` + `set_progress()` — fill stays inside track |
+| `AddTextLetterByLetter(text)` (flickers) | `Write(text)` or `FadeIn(text, shift=UP * 0.3)` |
+| `.next_to(container, DOWN)` for child elements | `.move_to(container.get_bottom() + UP * 0.5)` — keep children INSIDE |
+| `Text(f"{a}{b}")` with no separator | Always verify spaces: `Text(f"{a}: {b}")` or `Text(f"{a} {b}")` |
