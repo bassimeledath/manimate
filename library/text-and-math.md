@@ -1,7 +1,7 @@
 # Text & Math Reference
 
 ## Text (Pango-based — no LaTeX needed)
-    title = Text("Hello World", font_size=48, color=WHITE)
+    title = Text("Hello World", font_size=48, color=TEXT_CLR)
     bold = Text("Bold", weight=BOLD, font_size=32)
     italic = Text("Italic", slant=ITALIC, font_size=32)
 
@@ -9,8 +9,8 @@
     eq = MathTex(r"E = mc^2", font_size=36)
     # Color specific parts:
     eq = MathTex(r"a^2", "+", r"b^2", "=", r"c^2")
-    eq[0].set_color(RED)   # a^2
-    eq[2].set_color(BLUE)  # b^2
+    eq[0].set_color(PRIMARY)   # a^2
+    eq[2].set_color(ACCENT)    # b^2
 
 ## TransformMatchingTex
     eq1 = MathTex(r"a^2 + b^2 = c^2")

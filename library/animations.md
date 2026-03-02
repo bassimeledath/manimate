@@ -36,8 +36,13 @@ Morph through a sequence of states:
 
 ## Highlight and Annotate
 Draw attention to a specific part:
-    box = SurroundingRectangle(target, color=YELLOW, buff=0.1)
-    label = Text("key insight", font_size=24).next_to(box, DOWN)
+    box = RoundedRectangle(
+        corner_radius=0.08,
+        width=target.width + 0.3, height=target.height + 0.2,
+        stroke_color=HIGHLIGHT, stroke_width=1.5, fill_opacity=0,
+    )
+    box.move_to(target)
+    label = Text("key insight", font_size=24, color=TEXT_CLR).next_to(box, DOWN)
     self.play(Create(box), Write(label))
     self.wait(3)  # annotations/insights: minimum 3 seconds
 
@@ -49,7 +54,7 @@ Clear the current scene, bring in the next:
 
 ## Array/List Visualization
     boxes = VGroup(*[
-        Square(side_length=0.8).set_fill(BLUE, opacity=0.3)
+        Square(side_length=0.8).set_fill(ACCENT, opacity=0.3)
         for _ in range(8)
     ]).arrange(RIGHT, buff=0.1)
     numbers = VGroup(*[
@@ -60,7 +65,7 @@ Clear the current scene, bring in the next:
     self.play(Create(array))
 
 ## Pointer/Arrow Indicator
-    arrow = Arrow(start=UP, end=DOWN, color=YELLOW).next_to(boxes[3], UP)
+    arrow = Arrow(start=UP, end=DOWN, color=HIGHLIGHT, tip_length=0.15).next_to(boxes[3], UP)
     label = Text("mid", font_size=20).next_to(arrow, UP)
     self.play(Create(arrow), Write(label))
     # Move pointer:
@@ -70,7 +75,7 @@ Clear the current scene, bring in the next:
 ## Graph Plotting
     axes = Axes(x_range=[0, 10, 1], y_range=[0, 100, 10],
                 axis_config={"include_numbers": True})
-    graph = axes.plot(lambda x: x**2, color=BLUE)
+    graph = axes.plot(lambda x: x**2, color=ACCENT)
     label = axes.get_graph_label(graph, label="x^2")
     self.play(Create(axes), run_time=1.5)
     self.play(Create(graph), Write(label), run_time=2)

@@ -18,7 +18,7 @@ HIGHLIGHT = "#ffcc00"   # Yellow — emphasis, focus, "look here"
 SUCCESS   = "#66ff66"   # Green — success, correct, positive
 NEGATIVE  = "#ff4444"   # Red — errors, wrong, removed
 TEXT_CLR  = "#ffffff"   # White text
-TEXT_DIM  = "#6a6a8a"   # Muted text, labels, secondary info
+TEXT_DIM  = "#8a8aaa"   # Muted text, labels, secondary info
 # ───────────────────────────────────────────────────────
 ```
 
@@ -35,7 +35,7 @@ HIGHLIGHT = "#cc9900"   # Amber — darkened yellow
 SUCCESS   = "#339933"   # Deep Green
 NEGATIVE  = "#cc0000"   # Crimson
 TEXT_CLR  = "#2a2a3a"   # Dark text
-TEXT_DIM  = "#6a6a8a"   # Muted gray
+TEXT_DIM  = "#8a8aaa"   # Muted gray
 # ───────────────────────────────────────────────────────
 ```
 
@@ -402,7 +402,7 @@ self.wait(0.3)
 | SURFACE | `#3a3a4a` | `#f5f5f5` | Container backgrounds, card fills |
 | BORDER | `#4a4a5a` | `#e0e0e5` | Container strokes, structural arrows, dividing lines |
 | TEXT_CLR | `#ffffff` | `#2a2a3a` | All readable text |
-| TEXT_DIM | `#6a6a8a` | `#6a6a8a` | Annotations, axis labels, secondary text |
+| TEXT_DIM | `#8a8aaa` | `#8a8aaa` | Annotations, axis labels, secondary text |
 
 ### Rules
 1. **Max 3 accents at once**. If PRIMARY + ACCENT + HIGHLIGHT are all on screen, don't add SUCCESS or NEGATIVE. Remove or dim something first.
@@ -412,6 +412,7 @@ self.wait(0.3)
 5. **Containers use SURFACE fill + BORDER stroke**. Stroke width 1.5, fill_opacity 1 (dark) or 0.95 (light).
 6. **Structural elements use BORDER color**. Arrows connecting nodes, divider lines, axis lines — all BORDER.
 7. **MathTex defaults to TEXT_CLR**. Color individual parts with set_color() for emphasis.
+8. **Body text is always TEXT_CLR**. TEXT_DIM is ONLY for font_size 16 or smaller (captions, axis labels, annotations). Any text font_size >= 20 must use TEXT_CLR. When in doubt, use TEXT_CLR.
 
 ---
 
@@ -428,13 +429,18 @@ card = RoundedRectangle(
 
 ### Node in a Diagram
 ```python
-def make_node(label, color=PRIMARY, w=2.5, h=0.8):
+def make_node(label, color=None, w=2.5, h=0.8):
+    """Create a labeled rounded rectangle node. Box auto-sizes to fit text."""
+    if color is None:
+        color = PRIMARY
+    text = Text(label, font="Avenir Next", font_size=22, color=TEXT_CLR)
+    box_w = max(w, text.width + 0.6)
+    box_h = max(h, text.height + 0.4)
     box = RoundedRectangle(
-        corner_radius=0.15, width=w, height=h,
+        corner_radius=0.15, width=box_w, height=box_h,
         fill_color=SURFACE, fill_opacity=1,
         stroke_color=color, stroke_width=1.5,
     )
-    text = Text(label, font="Avenir Next", font_size=22, color=TEXT_CLR)
     text.move_to(box)
     return VGroup(box, text)
 ```
@@ -480,6 +486,42 @@ self.play(box.animate.set_stroke(color=PRIMARY, width=2.5), run_time=0.3)
 self.play(box.animate.scale(1.05), run_time=0.2)
 self.play(box.animate.scale(1.0), run_time=0.3)
 ```
+
+### Progress Bar
+```python
+def progress_bar(width=8, height=0.4, fill_color=None):
+    """Create a progress bar. Returns VGroup(track, fill) with fill at 0%.
+    Animate with: self.play(set_progress(bar, 0.75), run_time=1.0)"""
+    if fill_color is None:
+        fill_color = PRIMARY
+    pad = height * 0.12
+    track = RoundedRectangle(
+        corner_radius=height / 2, width=width, height=height,
+        fill_color=SURFACE, fill_opacity=1,
+        stroke_color=BORDER, stroke_width=1.5,
+    )
+    fill = RoundedRectangle(
+        corner_radius=max(0.05, (height - 2 * pad) / 2),
+        width=pad, height=height - 2 * pad,
+        fill_color=fill_color, fill_opacity=1, stroke_width=0,
+    )
+    fill.align_to(track, LEFT).shift(RIGHT * pad)
+    return VGroup(track, fill)
+
+
+def set_progress(bar, pct):
+    """Return .animate for bar fill to reach pct (0.0-1.0). Fill stays inside track."""
+    track, fill = bar[0], bar[1]
+    pad = track.height * 0.12
+    target_w = max(pad, (track.width - 2 * pad) * max(0.0, min(1.0, pct)))
+    return fill.animate.stretch_to_fit_width(target_w).align_to(
+        track, LEFT
+    ).shift(RIGHT * pad)
+```
+
+Usage: `self.play(set_progress(bar, 0.75), run_time=1.0)` — fill always stays inside the track because `set_progress()` re-aligns after every stretch.
+
+**NEVER** animate a raw Rectangle's width for progress — it will overflow the track. Always use `progress_bar()` + `set_progress()`.
 
 ---
 
@@ -543,57 +585,21 @@ highlight.move_to(code.code[1])  # highlight line 2
 Every manimate scene follows this structure:
 
 ```python
-from manim import *
-
-# ── Creative Chaos Dark ──
-BG        = "#2a2a3a"
-SURFACE   = "#3a3a4a"
-BORDER    = "#4a4a5a"
-PRIMARY   = "#ff3366"
-ACCENT    = "#33ccff"
-HIGHLIGHT = "#ffcc00"
-SUCCESS   = "#66ff66"
-NEGATIVE  = "#ff4444"
-TEXT_CLR  = "#ffffff"
-TEXT_DIM  = "#6a6a8a"
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from shared import *
 
 
 class SceneName(Scene):
     def construct(self):
-        self.camera.background_color = BG
+        setup_scene(self)                          # BG + dot grid
 
-        # 1. Dot grid (signature background)
-        dots = VGroup(*[
-            Dot([x, y, 0], radius=0.02, fill_opacity=0.08, color=TEXT_CLR)
-            for x in range(-7, 8) for y in range(-4, 5)
-        ])
-        self.add(dots)
+        title = title_card(self, "Title Here")     # bounce in → corner
 
-        # 2. Title card with underline (use title_card() helper for new scenes)
-        title = Text("Title Here", font="Galvji", font_size=44, color=TEXT_CLR, weight=BOLD)
-        underline = Line(
-            title.get_left() + DOWN * 0.35,
-            title.get_right() + DOWN * 0.35,
-            color=PRIMARY, stroke_width=2.5,
-        )
-        self.play(
-            FadeIn(title, shift=UP * 0.4),
-            GrowFromCenter(underline),
-            run_time=0.7,
-        )
-        self.wait(1.5)
-
-        # 3. Transition title to corner
-        self.play(
-            title.animate.scale(0.55).to_corner(UL, buff=0.5),
-            FadeOut(underline, run_time=0.3),
-            run_time=0.5,
-        )
-
-        # 4. Main content (bounces in)
+        # Main content (bounces in)
         # ... build content here using bounce entrances ...
 
-        # 5. Exit (drop out)
+        # Exit (drop out)
         self.play(
             *[FadeOut(mob, shift=DOWN * 0.3) for mob in self.mobjects],
             run_time=0.4,
@@ -604,121 +610,58 @@ class SceneName(Scene):
 
 ## Complete Examples
 
+> All examples use `from shared import *` — never inline palette constants.
+> See `templates/basic.py` for the minimal starter template.
+
 ### Example A: Title Card with Subtitle
 
 ```python
-from manim import *
-
-BG        = "#2a2a3a"
-SURFACE   = "#3a3a4a"
-BORDER    = "#4a4a5a"
-PRIMARY   = "#ff3366"
-ACCENT    = "#33ccff"
-HIGHLIGHT = "#ffcc00"
-TEXT_CLR  = "#ffffff"
-TEXT_DIM  = "#6a6a8a"
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from shared import *
 
 
 class TitleCard(Scene):
     def construct(self):
-        self.camera.background_color = BG
+        setup_scene(self)
 
-        # Dot grid
-        dots = VGroup(*[
-            Dot([x, y, 0], radius=0.02, fill_opacity=0.08, color=TEXT_CLR)
-            for x in range(-7, 8) for y in range(-4, 5)
-        ])
-        self.add(dots)
+        title = title_card(self, "Binary Search")
 
-        # Title with signature underline (or use title_card() helper)
-        title = Text(
-            "Binary Search", font="Galvji", font_size=44,
-            color=TEXT_CLR, weight=BOLD,
-        )
-        underline = Line(
-            title.get_left() + DOWN * 0.35,
-            title.get_right() + DOWN * 0.35,
-            color=PRIMARY, stroke_width=2.5,
-        )
-        self.play(
-            FadeIn(title, shift=UP * 0.4),
-            GrowFromCenter(underline),
-            run_time=0.7,
-        )
-        self.wait(1.5)
-
-        # Subtitle
+        # Subtitle (font_size 24 → TEXT_CLR, not TEXT_DIM)
         subtitle = Text(
             "Finding elements in sorted data, fast.",
-            font="Avenir Next", font_size=24, color=TEXT_DIM,
+            font="Avenir Next", font_size=24, color=TEXT_CLR,
         )
-        subtitle.next_to(underline, DOWN, buff=0.4)
+        subtitle.next_to(title, DOWN, buff=0.4)
         self.play(FadeIn(subtitle, shift=UP * 0.2), run_time=0.3)
-        self.wait(2)
+        self.wait(tw("Finding elements in sorted data, fast."))
 
-        # Transition: title moves to top-left, subtitle exits
-        self.play(
-            title.animate.scale(0.55).to_corner(UL, buff=0.5),
-            FadeOut(underline, run_time=0.3),
-            FadeOut(subtitle, shift=DOWN * 0.3),
-            run_time=0.5,
-        )
+        self.play(FadeOut(subtitle, shift=DOWN * 0.3), run_time=0.4)
         self.wait(1)
 ```
 
 ### Example B: Diagram / Flowchart
 
 ```python
-from manim import *
-
-BG        = "#2a2a3a"
-SURFACE   = "#3a3a4a"
-BORDER    = "#4a4a5a"
-PRIMARY   = "#ff3366"
-ACCENT    = "#33ccff"
-HIGHLIGHT = "#ffcc00"
-TEXT_CLR  = "#ffffff"
-TEXT_DIM  = "#6a6a8a"
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from shared import *
 
 
 class DiagramExample(Scene):
     def construct(self):
-        self.camera.background_color = BG
+        setup_scene(self)
 
-        dots = VGroup(*[
-            Dot([x, y, 0], radius=0.02, fill_opacity=0.08, color=TEXT_CLR)
-            for x in range(-7, 8) for y in range(-4, 5)
-        ])
-        self.add(dots)
+        title = title_card(self, "Request Lifecycle")
 
-        # Persistent title (already in corner position)
-        title = Text(
-            "Request Lifecycle", font="Galvji", font_size=24,
-            color=TEXT_CLR, weight=BOLD,
-        )
-        title.to_corner(UL, buff=0.5)
-        self.play(FadeIn(title, shift=UP * 0.2), run_time=0.3)
-
-        # Node factory
-        def make_node(label, color=PRIMARY, w=2.2, h=0.8):
-            box = RoundedRectangle(
-                corner_radius=0.15, width=w, height=h,
-                fill_color=SURFACE, fill_opacity=1,
-                stroke_color=color, stroke_width=1.5,
-            )
-            txt = Text(label, font="Avenir Next", font_size=20, color=TEXT_CLR)
-            txt.move_to(box)
-            return VGroup(box, txt)
-
-        # Nodes
+        # Nodes (make_node from shared.py)
         client  = make_node("Client", color=BORDER)
         gateway = make_node("API Gateway", color=PRIMARY)
         service = make_node("Service", color=ACCENT)
         db      = make_node("Database", color=HIGHLIGHT)
 
         nodes = VGroup(client, gateway, service, db)
-        nodes.arrange(RIGHT, buff=1.0)
-        nodes.move_to(DOWN * 0.3)
+        nodes.arrange(RIGHT, buff=1.0).move_to(DOWN * 0.3)
 
         # Arrows
         arrows = VGroup()
@@ -730,7 +673,7 @@ class DiagramExample(Scene):
                 tip_length=0.15, buff=0.1,
             ))
 
-        # Staggered entrance: node, arrow, node, arrow ...
+        # Staggered entrance
         for i, node in enumerate(nodes):
             self.play(FadeIn(node, shift=UP * 0.4), run_time=0.4)
             if i < len(arrows):
@@ -742,7 +685,7 @@ class DiagramExample(Scene):
         self.play(service.animate.scale(1.1), run_time=0.2)
         self.play(service.animate.scale(1.0), run_time=0.3)
 
-        # Label below
+        # Caption label (font_size 16 → TEXT_DIM is fine)
         label = Text(
             "processes the request",
             font="Avenir Next", font_size=16, color=TEXT_DIM,
@@ -761,29 +704,16 @@ class DiagramExample(Scene):
 ### Example C: Equation Derivation
 
 ```python
-from manim import *
-
-BG        = "#2a2a3a"
-SURFACE   = "#3a3a4a"
-BORDER    = "#4a4a5a"
-PRIMARY   = "#ff3366"
-ACCENT    = "#33ccff"
-HIGHLIGHT = "#ffcc00"
-TEXT_CLR  = "#ffffff"
-TEXT_DIM  = "#6a6a8a"
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from shared import *
 
 
 class EquationExample(Scene):
     def construct(self):
-        self.camera.background_color = BG
+        setup_scene(self)
 
-        dots = VGroup(*[
-            Dot([x, y, 0], radius=0.02, fill_opacity=0.08, color=TEXT_CLR)
-            for x in range(-7, 8) for y in range(-4, 5)
-        ])
-        self.add(dots)
-
-        # Section tag (small, primary-colored)
+        # Section tag (font_size 16 → TEXT_DIM-eligible, but tags use PRIMARY)
         tag = Text(
             "DERIVATION", font="Galvji", font_size=16,
             color=PRIMARY, weight=BOLD,
@@ -823,22 +753,23 @@ class EquationExample(Scene):
         )
         eq_colored[0].set_color(PRIMARY)      # e
         eq_colored[1].set_color(ACCENT)       # ipi
-        eq_colored[2].set_color(TEXT_DIM)     # +
+        eq_colored[2].set_color(BORDER)       # + (structural, not TEXT_DIM)
         eq_colored[3].set_color(HIGHLIGHT)    # 1
-        eq_colored[4].set_color(TEXT_DIM)     # =
+        eq_colored[4].set_color(BORDER)       # = (structural, not TEXT_DIM)
         eq_colored[5].set_color(HIGHLIGHT)    # 0
         eq_colored.move_to(card)
 
         self.play(TransformMatchingTex(eq, eq_colored), run_time=0.6)
         self.wait(0.5)
 
-        # Annotation
+        # Annotation (font_size 20 → TEXT_CLR, not TEXT_DIM)
         desc = Text(
             "Five fundamental constants in one equation.",
-            font="Avenir Next", font_size=20, color=TEXT_DIM,
+            font="Avenir Next", font_size=20, color=TEXT_CLR,
         )
         desc.next_to(card, DOWN, buff=0.5)
         self.play(FadeIn(desc, shift=UP * 0.2), run_time=0.3)
+        self.wait(tw("Five fundamental constants in one equation."))
 
         # Pop emphasis on the card
         self.play(card.animate.scale(1.03), run_time=0.2)
@@ -921,3 +852,6 @@ SVG fills and strokes must use the Creative Chaos palette hex values — never r
 | `Circle()` for a "user" or "person" | Custom SVG person icon |
 | Raw Manim colors in SVG fills (`BLUE`) | Palette hex values (`#ff3366`) |
 | Gradients/filters in SVGs | Flat fills only |
+| `TEXT_DIM` for body text (font_size >= 20) | `TEXT_CLR` — TEXT_DIM is only for captions (16) and axis labels |
+| Hard-coded box width with text inside | `make_node()` — auto-sizes box to fit text. Or measure: `max(w, text.width + 0.6)` |
+| Animating a raw Rectangle for a progress bar fill | `progress_bar()` + `set_progress()` — fill stays inside track |

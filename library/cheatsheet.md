@@ -54,20 +54,20 @@ class MyScene(Scene):
 
 ## Quality Flags (CLI)
 - -ql  →  854x480  @ 15fps
-- -qm  →  1280x720 @ 30fps (default for this skill)
-- -qh  →  1920x1080 @ 60fps
+- -qm  →  1280x720 @ 30fps
+- -qh  →  1920x1080 @ 60fps (default for this skill)
 - -qk  →  3840x2160 @ 60fps
 
 ## Manimate Color Tokens (use these, NOT raw Manim colors)
 Dark "Creative Chaos" (default):
   BG="#2a2a3a"  SURFACE="#3a3a4a"  BORDER="#4a4a5a"
   PRIMARY="#ff3366"  ACCENT="#33ccff"  HIGHLIGHT="#ffcc00"  SUCCESS="#66ff66"  NEGATIVE="#ff4444"
-  TEXT_CLR="#ffffff"  TEXT_DIM="#6a6a8a"
+  TEXT_CLR="#ffffff"  TEXT_DIM="#8a8aaa"
 
 Light "Daylight Chaos":
   BG="#ffffff"  SURFACE="#f5f5f5"  BORDER="#e0e0e5"
   PRIMARY="#cc2952"  ACCENT="#0099cc"  HIGHLIGHT="#cc9900"  SUCCESS="#339933"  NEGATIVE="#cc0000"
-  TEXT_CLR="#2a2a3a"  TEXT_DIM="#6a6a8a"
+  TEXT_CLR="#2a2a3a"  TEXT_DIM="#8a8aaa"
 
 ## Raw Manim Colors (avoid in manimate scenes — use tokens above)
 PRIMARY:   BLUE, RED, GREEN, YELLOW, PURPLE, ORANGE, TEAL, PINK
@@ -78,29 +78,16 @@ SPECIAL:   GOLD, MAROON, DARK_BROWN, LIGHT_BROWN
 ## SVG Icons (custom visuals — KEY differentiator)
 For real-world concepts (servers, databases, users, locks, etc.), generate custom SVGs instead of using basic shapes. This is what makes manimate videos look professional.
 
-### The Pipeline: string → tempfile → SVGMobject
+### Primary Pattern: load_asset()
+Pre-validated SVGs live in `.manimate/assets/`. Load them by ID:
 ```python
-import tempfile, os
+icon = load_asset("server_icon", scale=0.8)      # from .manimate/assets/server_icon.svg
+db   = load_asset("database_icon", scale=0.8)
+```
 
-def svg_icon(svg_string, scale=1.0):
-    """Write inline SVG to temp file and load as SVGMobject."""
-    tmpdir = tempfile.mkdtemp()
-    path = os.path.join(tmpdir, "icon.svg")
-    with open(path, "w") as f:
-        f.write(svg_string)
-    return SVGMobject(path).scale(scale)
-
-# Define SVG as a string constant, then load it
-SVG_SERVER = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
-  <rect x="5" y="5" width="70" height="25" rx="5" fill="#ff3366" stroke="#ffffff" stroke-width="2"/>
-  <rect x="5" y="38" width="70" height="25" rx="5" fill="#ff3366" stroke="#ffffff" stroke-width="2"/>
-  <rect x="5" y="71" width="70" height="25" rx="5" fill="#ff3366" stroke="#ffffff" stroke-width="2"/>
-  <circle cx="18" cy="17" r="4" fill="#33ccff"/>
-  <circle cx="18" cy="50" r="4" fill="#33ccff"/>
-  <circle cx="18" cy="83" r="4" fill="#ffcc00"/>
-</svg>'''
-
-server = svg_icon(SVG_SERVER, scale=0.8)
+### Fallback: svg_icon() for rare one-off SVGs (under 5 lines)
+```python
+icon = svg_icon('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">...</svg>', scale=0.8)
 ```
 
 ### SVG Rules
@@ -127,7 +114,7 @@ icon.submobjects[0].set_fill(PRIMARY)                 # Recolor first element
 user = svg_icon(SVG_USER, scale=0.8).move_to(LEFT * 3)
 server = svg_icon(SVG_SERVER, scale=0.8).move_to(RIGHT * 3)
 arrow = Arrow(user.get_right(), server.get_left(), color=BORDER, buff=0.3)
-label = Text("request", font_size=20, color=TEXT_DIM).next_to(arrow, UP, buff=0.15)
+label = Text("request", font_size=20, color=TEXT_CLR).next_to(arrow, UP, buff=0.15)
 ```
 
 Generate SVGs at runtime following the SVG Icon Style Rules in the style guide. LLMs produce great SVGs — just follow the palette, stroke, and flat-design constraints.

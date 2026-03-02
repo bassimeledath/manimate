@@ -60,13 +60,8 @@ story = json.load(open('$STORY_FILE'))
 print(story['scenes'][$((N-1))]['scene_class'])
   ")
 
-  # Try expected path first, then search
-  EXPECTED="$MEDIA_DIR/videos/$SCENE_FILE/720p30/${SCENE_CLASS}.mp4"
-  if [ -f "$EXPECTED" ]; then
-    VIDEO="$EXPECTED"
-  else
-    VIDEO=$(find "$MEDIA_DIR/videos" -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
-  fi
+  # Search for the rendered video (quality dir varies by -q flag)
+  VIDEO=$(find "$MEDIA_DIR/videos" -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
 
   if [ -z "$VIDEO" ] || [ ! -f "$VIDEO" ]; then
     echo "Error: could not find rendered video for scene $N ($SCENE_CLASS)"

@@ -18,7 +18,7 @@ class BasicScene(Scene):
 
         # 2. Main content — SVG icon example
         icon = load_asset("server_icon", scale=0.8)
-        label = Text("Server", font="Avenir Next", font_size=20, color=TEXT_DIM)
+        label = Text("Server", font="Avenir Next", font_size=20, color=TEXT_CLR)
         label.next_to(icon, DOWN, buff=0.3)
         content = VGroup(icon, label)
         content.move_to(ORIGIN)

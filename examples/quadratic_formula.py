@@ -1,40 +1,49 @@
-from manim import *
-
-BG_COLOR = "#1e1e2e"
-ACCENT = BLUE
-HIGHLIGHT = YELLOW
-TEXT_CLR = WHITE
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from shared import *
 
 
 class QuadraticSetup(Scene):
     """Scene 1: Introduce the quadratic equation."""
     def construct(self):
-        self.camera.background_color = BG_COLOR
+        setup_scene(self)
 
-        title = Text("The Quadratic Formula", font_size=48, color=TEXT_CLR)
-        self.play(Write(title))
-        self.wait(1)
-        self.play(title.animate.to_edge(UP).scale(0.6))
+        title = title_card(self, "The Quadratic Formula")
 
+        # Starting equation in a card
+        card = RoundedRectangle(
+            corner_radius=0.15, width=8, height=2,
+            fill_color=SURFACE, fill_opacity=0.8,
+            stroke_color=BORDER, stroke_width=1,
+        )
         eq = MathTex(r"ax^2 + bx + c = 0", font_size=44)
-        self.play(Write(eq))
+        eq.set_color(TEXT_CLR)
+        eq.move_to(card)
+
+        self.play(FadeIn(card, shift=UP * 0.4), run_time=0.4)
+        self.play(Write(eq), run_time=0.7)
         self.wait(1)
 
-        desc = Text("We want to solve for x", font_size=28, color=ACCENT)
-        desc.next_to(eq, DOWN, buff=0.8)
-        self.play(FadeIn(desc))
-        self.wait(2)
+        desc = Text(
+            "We want to solve for x",
+            font="Avenir Next", font_size=26, color=TEXT_CLR,
+        )
+        desc.next_to(card, DOWN, buff=0.5)
+        self.play(FadeIn(desc, shift=UP * 0.3), run_time=0.4)
+        self.wait(tw("We want to solve for x"))
 
-        self.play(*[FadeOut(mob) for mob in self.mobjects])
+        self.play(
+            *[FadeOut(mob, shift=DOWN * 0.3) for mob in self.mobjects],
+            run_time=0.4,
+        )
 
 
 class QuadraticDerivation(Scene):
     """Scene 2: Derive the formula step by step."""
     def construct(self):
-        self.camera.background_color = BG_COLOR
+        setup_scene(self)
 
-        title = Text("Completing the Square", font_size=28, color=TEXT_CLR).to_edge(UP)
-        self.add(title)
+        title = title_card(self, "Completing the Square")
 
         steps = [
             r"ax^2 + bx + c = 0",
@@ -45,18 +54,33 @@ class QuadraticDerivation(Scene):
         ]
 
         current = MathTex(steps[0], font_size=36)
-        self.play(Write(current))
-        self.wait(1)
+        current.set_color(TEXT_CLR)
+        self.play(Write(current), run_time=0.7)
+        self.wait(1.5)
 
         for step in steps[1:]:
             next_eq = MathTex(step, font_size=36)
-            self.play(TransformMatchingTex(current, next_eq))
+            next_eq.set_color(TEXT_CLR)
+            self.play(TransformMatchingTex(current, next_eq), run_time=0.6)
             current = next_eq
             self.wait(1.5)
 
-        # Highlight the final formula
-        box = SurroundingRectangle(current, color=HIGHLIGHT, buff=0.2)
-        self.play(Create(box))
+        # Highlight the final formula with a rounded card
+        highlight = RoundedRectangle(
+            corner_radius=0.15,
+            width=current.width + 0.6, height=current.height + 0.4,
+            fill_color=SURFACE, fill_opacity=0.5,
+            stroke_color=PRIMARY, stroke_width=2,
+        )
+        highlight.move_to(current)
+        self.play(FadeIn(highlight), run_time=0.3)
+
+        # Pop emphasis
+        self.play(highlight.animate.scale(1.05), run_time=0.2)
+        self.play(highlight.animate.scale(1.0), run_time=0.3)
         self.wait(2)
 
-        self.play(*[FadeOut(mob) for mob in self.mobjects])
+        self.play(
+            *[FadeOut(mob, shift=DOWN * 0.3) for mob in self.mobjects],
+            run_time=0.4,
+        )

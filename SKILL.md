@@ -167,7 +167,7 @@ Write `.manimate/story.json` with a top-level `asset_manifest` and per-scene `sv
     "highlight_color": "#ffcc00",
     "success_color": "#66ff66",
     "text_color": "#ffffff",
-    "muted_color": "#6a6a8a",
+    "muted_color": "#8a8aaa",
     "font_heading": "Galvji",
     "font_body": "Avenir Next",
     "font_code": "Monaco",
@@ -269,7 +269,7 @@ HIGHLIGHT = "#ffcc00"
 SUCCESS   = "#66ff66"
 NEGATIVE  = "#ff4444"
 TEXT_CLR  = "#ffffff"
-TEXT_DIM  = "#6a6a8a"
+TEXT_DIM  = "#8a8aaa"
 
 # ── Asset directory ──
 ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
@@ -343,17 +343,49 @@ def title_card(scene, text, wait=1.5):
 
 
 def make_node(label, color=None, w=2.5, h=0.8):
-    """Create a labeled rounded rectangle node for diagrams."""
+    """Create a labeled rounded rectangle node. Box auto-sizes to fit text."""
     if color is None:
         color = PRIMARY
+    text = Text(label, font="Avenir Next", font_size=22, color=TEXT_CLR)
+    box_w = max(w, text.width + 0.6)
+    box_h = max(h, text.height + 0.4)
     box = RoundedRectangle(
-        corner_radius=0.15, width=w, height=h,
+        corner_radius=0.15, width=box_w, height=box_h,
         fill_color=SURFACE, fill_opacity=1,
         stroke_color=color, stroke_width=1.5,
     )
-    text = Text(label, font="Avenir Next", font_size=22, color=TEXT_CLR)
     text.move_to(box)
     return VGroup(box, text)
+
+
+def progress_bar(width=8, height=0.4, fill_color=None):
+    """Create a progress bar. Returns VGroup(track, fill) with fill at 0%.
+    Animate with: self.play(set_progress(bar, 0.75), run_time=1.0)"""
+    if fill_color is None:
+        fill_color = PRIMARY
+    pad = height * 0.12
+    track = RoundedRectangle(
+        corner_radius=height / 2, width=width, height=height,
+        fill_color=SURFACE, fill_opacity=1,
+        stroke_color=BORDER, stroke_width=1.5,
+    )
+    fill = RoundedRectangle(
+        corner_radius=max(0.05, (height - 2 * pad) / 2),
+        width=pad, height=height - 2 * pad,
+        fill_color=fill_color, fill_opacity=1, stroke_width=0,
+    )
+    fill.align_to(track, LEFT).shift(RIGHT * pad)
+    return VGroup(track, fill)
+
+
+def set_progress(bar, pct):
+    """Return .animate for bar fill to reach pct (0.0-1.0). Fill stays inside track."""
+    track, fill = bar[0], bar[1]
+    pad = track.height * 0.12
+    target_w = max(pad, (track.width - 2 * pad) * max(0.0, min(1.0, pct)))
+    return fill.animate.stretch_to_fit_width(target_w).align_to(
+        track, LEFT
+    ).shift(RIGHT * pad)
 ```
 
 **Populate palette values** from `story.json` `shared_style` — if the user chose a light theme, use the light palette hex values instead.
@@ -519,6 +551,12 @@ Generate each scene file. Scenes import from `shared.py` and load assets via `lo
    22. NEVER use bare `self.wait()` after text — always calculate from word count
    23. NEVER use `self.wait(0.5)` or `self.wait(1)` after text that has more than 3 words
    24. Between conceptual sections, use `self.wait(1.5)` as a transition pause
+
+   **Visual Polish Rules (CRITICAL — prevents rendering issues):**
+
+   25. **Text color**: body text (font_size >= 20) always uses `TEXT_CLR`. Use `TEXT_DIM` ONLY for captions (font_size 16) and axis labels.
+   26. **Contained text**: when placing text inside a container, ALWAYS measure text width first and size the container to fit: `max(desired_w, text.width + 0.6)`. Or use `make_node()` which auto-sizes. NEVER hard-code a container width without checking the text.
+   27. **Progress bars**: use `progress_bar()` and `set_progress()` from shared.py. NEVER animate a raw Rectangle's width for progress — it will overflow the track.
 
 **Expected scene size**: 80-130 lines (vs 180-230 with inlined constants).
 
@@ -686,7 +724,7 @@ Read these library files before writing each scene (see Step 8 for which files a
 1. **ManimCE only** — `from manim import *` (never `manimlib`). Cairo renderer for headless safety.
 2. **One Scene class per file** — each scene is a separate `.py` file for isolated error recovery.
 3. **Inline generation** — the orchestrating agent writes scene files directly (no sub-processes), ensuring the user's chosen model is used throughout.
-4. **Shared preamble** — `shared.py` contains palette constants, helpers (`setup_scene`, `title_card`, `dot_grid`, `tw`, `make_node`), and asset loading (`load_asset`). Scenes import, not copy.
+4. **Shared preamble** — `shared.py` contains palette constants, helpers (`setup_scene`, `title_card`, `dot_grid`, `tw`, `make_node`, `progress_bar`, `set_progress`), and asset loading (`load_asset`). Scenes import, not copy.
 5. **Asset-first** — SVG icons are generated and validated in Steps 6-7 before scene code is written. Scenes load validated assets via `load_asset()`, not inline SVG strings.
 6. **Two validation gates** — asset grid (Step 7) and layout frame (Step 9) catch visual issues before the expensive full render in Step 10.
 7. **Import from shared.py** — scenes use `from shared import *` for palette, helpers, and asset loading. No inlined constants.
