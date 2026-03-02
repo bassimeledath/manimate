@@ -112,3 +112,5 @@ GOOD: lake = RoundedRectangle(fill_color=ACCENT, fill_opacity=0.4, ...)  # palet
 GOOD: sky = Rectangle(fill_color=ACCENT, fill_opacity=0.15, ...)         # tinted from palette
 ```
 Every fill, stroke, and text color must come from the palette (BG, SURFACE, BORDER, PRIMARY, ACCENT, HIGHLIGHT, SUCCESS, NEGATIVE, TEXT_CLR, TEXT_DIM). To create variations, adjust `fill_opacity` or `stroke_opacity` — never invent new hex codes. For natural elements (water, sky, vegetation), use the closest palette token with reduced opacity.
+
+**Narrow exception**: Physical material fills (coffee grounds, soil, food, liquids representing a real substance) may use custom hex codes when no palette color is a reasonable match. This applies ONLY to `fill_color` of objects depicting real-world materials — never for stroke_color, text color, backgrounds, or UI containers.
