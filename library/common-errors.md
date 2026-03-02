@@ -103,3 +103,12 @@ BAD:  fill = Rectangle(width=0.1, ...)
 GOOD: bar = progress_bar(width=8)
       self.play(set_progress(bar, 0.75), run_time=1.0)  # always stays inside
 ```
+
+## 18. Hardcoded hex colors outside the palette
+```
+BAD:  lake = RoundedRectangle(fill_color="#1a6b8a", ...)    # invented color
+BAD:  sky = Rectangle(fill_color="#87CEEB", ...)             # not in palette
+GOOD: lake = RoundedRectangle(fill_color=ACCENT, fill_opacity=0.4, ...)  # palette + opacity
+GOOD: sky = Rectangle(fill_color=ACCENT, fill_opacity=0.15, ...)         # tinted from palette
+```
+Every fill, stroke, and text color must come from the palette (BG, SURFACE, BORDER, PRIMARY, ACCENT, HIGHLIGHT, SUCCESS, NEGATIVE, TEXT_CLR, TEXT_DIM). To create variations, adjust `fill_opacity` or `stroke_opacity` — never invent new hex codes. For natural elements (water, sky, vegetation), use the closest palette token with reduced opacity.
