@@ -2,7 +2,7 @@
 
 A coding-agent skill that turns natural language prompts into animated videos using Manim.
 
-<video src="public/manimate-intro.mp4" autoplay loop muted playsinline></video>
+![How manimate works](public/manimate-intro.gif)
 
 ## Install
 
