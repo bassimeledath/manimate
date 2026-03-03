@@ -98,7 +98,7 @@ Key elements get a quick scale pop for emphasis. Clean and 2D — no gradients, 
 ```python
 # Pop emphasis: quick scale up then settle back
 self.play(element.animate.scale(1.15), run_time=0.2)
-self.play(element.animate.scale(1.0), run_time=0.3)
+self.play(element.animate.scale(1/1.15), run_time=0.3)
 
 # Or with a colored stroke flash
 flash = element.copy().set_stroke(
@@ -206,7 +206,7 @@ self.play(
     GrowFromCenter(underline),
     run_time=0.7,
 )
-self.wait(1.5)
+self.wait(2.0)
 
 # Transition title to corner — LEFT aligned, not centered
 self.play(
@@ -221,13 +221,13 @@ self.play(
 Copy this function into any scene to get the standard title card pattern — bounce in, display, move to corner. This ensures consistent underline positioning.
 
 ```python
-def title_card(scene, text, wait=1.5):
+def title_card(scene, text, wait=2.0):
     """Show title with signature underline, then move to corner.
 
     Args:
         scene: the Scene instance (pass `self` from construct)
         text: the title string
-        wait: seconds to display before moving to corner (default 1.5)
+        wait: seconds to display before moving to corner (default 2.0)
     Returns:
         title Mobject (now in the UL corner at scale 0.55)
     """
@@ -372,12 +372,12 @@ self.play(
 ```
 
 ### Emphasis — "Pop"
-Don't use `Indicate()` — it's the generic Manim look. Use a scale pop instead.
+Prefer the pop pattern for text and labels. `Indicate()` is acceptable for icons, nodes, and non-text mobjects.
 
 ```python
 # Quick pop: scale up then back
 self.play(element.animate.scale(1.15), run_time=0.2)
-self.play(element.animate.scale(1.0), run_time=0.3)
+self.play(element.animate.scale(1/1.15), run_time=0.3)
 
 # Stroke flash (for containers/boxes)
 flash = element.copy().set_stroke(
@@ -415,7 +415,7 @@ self.wait(0.3)
 ### Timing Guide
 | Action | Duration | Notes |
 |--------|----------|-------|
-| Title entrance (bounce + underline) | 0.7s | Display for 1.5s before moving |
+| Title entrance (bounce + underline) | 0.7s | Display for 2.0s before moving |
 | Element entrance (bounce) | 0.5s | |
 | Secondary entrance | 0.3s | Subtitles, labels |
 | Group cascade | 0.7s total | lag_ratio=0.15 |
@@ -527,7 +527,7 @@ eq.move_to(card)
 # Brighten the stroke to PRIMARY and pop
 self.play(box.animate.set_stroke(color=PRIMARY, width=2.5), run_time=0.3)
 self.play(box.animate.scale(1.05), run_time=0.2)
-self.play(box.animate.scale(1.0), run_time=0.3)
+self.play(box.animate.scale(1/1.05), run_time=0.3)
 ```
 
 ### Progress Bar
@@ -849,7 +849,7 @@ class EquationExample(Scene):
 | `Rectangle()` for containers | `RoundedRectangle(corner_radius=0.15, ...)` |
 | `stroke_width=4` (thick default) | `stroke_width=1.5` (refined) |
 | `WHITE` text color | `TEXT_CLR` (#ffffff) |
-| `Indicate(obj)` for emphasis | Pop pattern (scale up + settle) |
+| `Indicate(obj)` for text emphasis | Pop pattern (scale up + settle). `Indicate()` OK for icons/nodes |
 | `background_color = "#1e1e2e"` | `background_color = BG` (use the token) |
 | `font_size=48` for everything | Use the size scale: 44/32/26/20/16 |
 | No `font` parameter | `font="Helvetica Neue"` for all text (headings use `weight=BOLD`) |

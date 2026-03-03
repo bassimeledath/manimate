@@ -25,7 +25,7 @@ class BasicScene(Scene):
 
         self.play(FadeIn(icon, shift=UP * 0.4), run_time=0.5)
         self.play(FadeIn(label, shift=UP * 0.2), run_time=0.3)
-        self.wait(2)
+        self.wait(tw("Server"))
 
         # 3. Exit (drop out)
         self.play(

@@ -33,7 +33,7 @@ Parse the user's prompt and infer rendering parameters:
 | `style` | educational/minimal/cinematic | educational | Infer from the tone/subject |
 | `duration_per_scene` | 5-15s | 8 | Longer for complex concepts, shorter for simple transitions |
 
-Write to `.manimate/params.json`:
+Write to `$WORK_DIR/params.json`:
 
 ```json
 {
@@ -46,7 +46,7 @@ Write to `.manimate/params.json`:
 }
 ```
 
-Write `.manimate/manim.cfg`:
+Write `$WORK_DIR/manim.cfg`:
 
 ```ini
 [CLI]
@@ -103,12 +103,15 @@ else
 fi
 ```
 
-Create working directory:
+Create a **run-scoped** working directory to allow concurrent pipeline executions:
 
 ```bash
-rm -rf .manimate
-mkdir -p .manimate/scenes .manimate/assets .manimate/lastframes .manimate/output
+WORK_DIR=".manimate-$(date +%s)-$$"
+mkdir -p "$WORK_DIR"/scenes "$WORK_DIR"/assets "$WORK_DIR"/lastframes "$WORK_DIR"/output
+echo "Working directory: $WORK_DIR"
 ```
+
+> **`WORK_DIR` is the pipeline root for this run.** All subsequent steps reference `$WORK_DIR` instead of a hardcoded `.manimate` path. This prevents data loss when multiple `/manimate` invocations run concurrently.
 
 > **Pipeline-wide LATEX_AVAILABLE flag**: When `false`, scene code must NOT use MathTex or Tex — use Text() for all text, including math expressions. Render equations as Unicode or ASCII.
 
@@ -122,7 +125,7 @@ Break the prompt into scenes. Each scene specifies visual elements, animations, 
 
 Use basic Manim shapes **only** for: array cells, flowchart boxes, graphs/axes, code blocks, containers, math expressions. **Everything else gets an SVG.**
 
-Write `.manimate/story.json` with a top-level `asset_manifest` and per-scene `svg_assets` referencing manifest keys:
+Write `$WORK_DIR/story.json` with a top-level `asset_manifest` and per-scene `svg_assets` referencing manifest keys:
 
 ```json
 {
@@ -209,7 +212,7 @@ Write `.manimate/story.json` with a top-level `asset_manifest` and per-scene `sv
 
 Before generating any code, present the story outline to the user for review and approval.
 
-**Build a readable summary from `.manimate/story.json`:**
+**Build a readable summary from `$WORK_DIR/story.json`:**
 
 ```
 Scene Outline for: "{title}"
@@ -255,8 +258,8 @@ After presenting the outline, STOP. Do not generate any code, write any files, o
 
 **Revision loop:**
 
-- If the user requests changes, update `.manimate/story.json` accordingly (add/remove scenes, edit descriptions, adjust durations, etc.) and re-present the outline.
-- If the user changes the output format, update `.manimate/params.json` (`format` field) and `.manimate/manim.cfg` to match.
+- If the user requests changes, update `$WORK_DIR/story.json` accordingly (add/remove scenes, edit descriptions, adjust durations, etc.) and re-present the outline.
+- If the user changes the output format, update `$WORK_DIR/params.json` (`format` field) and `$WORK_DIR/manim.cfg` to match.
 - Repeat until the user explicitly approves (e.g., "looks good", "approved", "go ahead", "yes").
 
 Once — and ONLY once — the user explicitly approves, proceed to Step 5.
@@ -265,9 +268,9 @@ Once — and ONLY once — the user explicitly approves, proceed to Step 5.
 
 ### Step 5: Shared Preamble Generation
 
-Generate `.manimate/shared.py` — a single module containing palette constants, helpers, and asset loading that all scenes import. This eliminates ~50 lines of duplicated boilerplate from each scene file.
+Generate `$WORK_DIR/shared.py` — a single module containing palette constants, helpers, and asset loading that all scenes import. This eliminates ~50 lines of duplicated boilerplate from each scene file.
 
-**Write `.manimate/shared.py`** by copying the code block below VERBATIM. Do NOT change ANY hex value — not even the background tones (BG, SURFACE, BORDER). The exact hex codes below are the Creative Chaos brand palette and must appear character-for-character in the generated file:
+**Write `$WORK_DIR/shared.py`** by copying the code block below VERBATIM. Do NOT change ANY hex value — not even the background tones (BG, SURFACE, BORDER). The exact hex codes below are the Creative Chaos brand palette and must appear character-for-character in the generated file:
 
 ```python
 from manim import *
@@ -300,7 +303,7 @@ def svg_icon(svg_string, scale=1.0):
 
 
 def load_asset(asset_id, scale=1.0):
-    """Load a validated SVG asset from .manimate/assets/."""
+    """Load a validated SVG asset from the assets directory."""
     path = os.path.join(ASSET_DIR, f"{asset_id}.svg")
     if not os.path.exists(path):
         raise FileNotFoundError(f"Asset not found: {path}")
@@ -326,13 +329,13 @@ def setup_scene(scene):
     scene.add(dot_grid())
 
 
-def title_card(scene, text, wait=1.5):
+def title_card(scene, text, wait=2.0):
     """Show title with signature underline, then move to corner.
 
     Args:
         scene: the Scene instance (pass `self` from construct)
         text: the title string
-        wait: seconds to display before moving to corner (default 1.5)
+        wait: seconds to display before moving to corner (default 2.0)
     Returns:
         title Mobject (now in the UL corner at scale 0.55)
     """
@@ -449,7 +452,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from shared import *
 ```
 
-This works because render runs from `.manimate/` as CWD (`cd .manimate && manim render scenes/scene_NN.py`).
+This works because render runs from `$WORK_DIR` as CWD (`cd "$WORK_DIR" && manim render scenes/scene_NN.py`).
 
 ---
 
@@ -471,16 +474,16 @@ For each entry in `asset_manifest` from story.json, generate a validated SVG fil
    - Line endings: `stroke-linecap="round" stroke-linejoin="round"`
    - Center content within the viewBox
    - Keep simple — Manim's SVG parser handles basic shapes well but struggles with complex paths
-4. Write the SVG file to `.manimate/assets/{asset_id}.svg`
+4. Write the SVG file to `$WORK_DIR/assets/{asset_id}.svg`
 
 ```bash
 # Verify each asset file was written
 for ASSET_ID in $(python3 -c "
 import json
-m = json.load(open('.manimate/story.json'))['asset_manifest']
+m = json.load(open('$WORK_DIR/story.json'))['asset_manifest']
 print(' '.join(m.keys()))
 "); do
-  [ -f ".manimate/assets/${ASSET_ID}.svg" ] || echo "Missing asset: ${ASSET_ID}"
+  [ -f "$WORK_DIR/assets/${ASSET_ID}.svg" ] || echo "Missing asset: ${ASSET_ID}"
 done
 ```
 
@@ -494,7 +497,7 @@ Verify all generated SVG assets render correctly in Manim before using them in s
 
 **Procedure:**
 
-1. Write a temporary validation scene `.manimate/scenes/_asset_validation.py`:
+1. Write a temporary validation scene `$WORK_DIR/scenes/_asset_validation.py`:
 
 ```python
 import sys, os
@@ -529,14 +532,14 @@ class AssetValidation(Scene):
 3. Render the validation scene as a still frame:
 
 ```bash
-cd .manimate && manim render -ql -s --renderer=cairo --disable_caching \
+cd "$WORK_DIR" && manim render -ql -s --renderer=cairo --disable_caching \
   scenes/_asset_validation.py AssetValidation 2>/dev/null
 ```
 
 4. Find and read the output PNG:
 
 ```bash
-VALIDATION_PNG=$(find .manimate/media/images -name "AssetValidation*.png" 2>/dev/null | head -1)
+VALIDATION_PNG=$(find "$WORK_DIR"/media/images -name "AssetValidation*.png" 2>/dev/null | head -1)
 ```
 
 5. Inspect the grid image. For each asset, verify:
@@ -546,7 +549,7 @@ VALIDATION_PNG=$(find .manimate/media/images -name "AssetValidation*.png" 2>/dev
 
 6. If any asset fails: regenerate its SVG file, re-render the grid (max 2 retries per asset)
 
-7. Clean up: `rm .manimate/scenes/_asset_validation.py`
+7. Clean up: `rm "$WORK_DIR/scenes/_asset_validation.py"`
 
 ---
 
@@ -556,7 +559,7 @@ Generate each scene file. Scenes import from `shared.py` and load assets via `lo
 
 **For each scene N (sequentially):**
 
-1. **Read the scene spec** from `.manimate/story.json` — extract the scene entry, `shared_style`, and `latex_available` flag.
+1. **Read the scene spec** from `$WORK_DIR/story.json` — extract the scene entry, `shared_style`, and `latex_available` flag.
 
 2. **Read the relevant library files** based on scene template type:
 
@@ -570,7 +573,7 @@ Generate each scene file. Scenes import from `shared.py` and load assets via `lo
 
 3. **Read the template** from `templates/{template}.py` (e.g., `templates/basic.py`).
 
-4. **Write the scene file** to `.manimate/scenes/scene_NN.py` following these rules:
+4. **Write the scene file** to `$WORK_DIR/scenes/scene_NN.py` following these rules:
 
    1. Start with the shared import: `import sys, os` / `sys.path.insert(...)` / `from shared import *`
    2. Define exactly ONE Scene subclass named `{scene_class}` (from story.json)
@@ -614,7 +617,7 @@ Generate each scene file. Scenes import from `shared.py` and load assets via `lo
 5. **Validate the generated file:**
 
 ```bash
-FILE=".manimate/scenes/scene_$(printf "%02d" $N).py"
+FILE="$WORK_DIR/scenes/scene_$(printf "%02d" $N).py"
 SCENE_CLASS="<scene_class from story.json>"
 
 python3 -c "compile(open('$FILE').read(), '$FILE', 'exec')" 2>/dev/null || {
@@ -645,7 +648,7 @@ After writing each scene, validate the layout visually. Scenes end with `FadeOut
 1. **Render a low-quality video** (fast: ~5-10s at 480p 15fps):
 
 ```bash
-cd .manimate && manim render -ql --renderer=cairo --disable_caching \
+cd "$WORK_DIR" && manim render -ql --renderer=cairo --disable_caching \
   scenes/scene_$(printf "%02d" $N).py $SCENE_CLASS 2>/dev/null
 ```
 
@@ -653,10 +656,10 @@ cd .manimate && manim render -ql --renderer=cairo --disable_caching \
 
 ```bash
 SCENE_FILE="scene_$(printf "%02d" $N)"
-VIDEO_PATH=$(find .manimate/media/videos/${SCENE_FILE} -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
+VIDEO_PATH=$(find "$WORK_DIR"/media/videos/${SCENE_FILE} -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
 ffmpeg -i "$VIDEO_PATH" \
   -vf "select=eq(n\,30)" -vframes 1 -y \
-  .manimate/lastframes/${SCENE_FILE}_layout.png 2>/dev/null
+  "$WORK_DIR"/lastframes/${SCENE_FILE}_layout.png 2>/dev/null
 ```
 
 3. **Read the extracted PNG** and evaluate against this rubric:
@@ -694,7 +697,7 @@ if [ -n "$TIMEOUT_CMD" ]; then
   RENDER_CMD="$TIMEOUT_CMD 180 $RENDER_CMD"
 fi
 
-cd .manimate && eval $RENDER_CMD 2>"$RENDER_LOG"
+cd "$WORK_DIR" && eval $RENDER_CMD 2>"$RENDER_LOG"
 RENDER_EXIT=$?
 cd ..
 ```
@@ -703,9 +706,9 @@ cd ..
 
 ```bash
 QUALITY_SUBDIR="1080p60"  # matches -qh
-EXPECTED_PATH=".manimate/media/videos/${SCENE_FILE}/${QUALITY_SUBDIR}/${SCENE_CLASS}.mp4"
+EXPECTED_PATH="$WORK_DIR/media/videos/${SCENE_FILE}/${QUALITY_SUBDIR}/${SCENE_CLASS}.mp4"
 if [ ! -f "$EXPECTED_PATH" ]; then
-  FOUND_PATH=$(find .manimate/media/videos -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
+  FOUND_PATH=$(find "$WORK_DIR"/media/videos -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
 fi
 ```
 
@@ -725,14 +728,14 @@ Run the render script to concatenate scene videos and convert to GIF:
 
 ```bash
 bash "scripts/render.sh" \
-  --scenes-dir .manimate/scenes \
-  --media-dir .manimate/media \
-  --output-dir .manimate/output \
+  --scenes-dir "$WORK_DIR"/scenes \
+  --media-dir "$WORK_DIR"/media \
+  --output-dir "$WORK_DIR"/output \
   --format "$FORMAT" \
-  --story-file .manimate/story.json
+  --story-file "$WORK_DIR"/story.json
 ```
 
-> `scripts/render.sh` is relative to the skill directory. `$FORMAT` comes from `.manimate/params.json`.
+> `scripts/render.sh` is relative to the skill directory. `$FORMAT` comes from `$WORK_DIR/params.json`.
 
 ---
 
@@ -751,9 +754,9 @@ Assets: 2 SVGs generated and validated (magnifier_icon, checkmark_icon)
 Layout validation: 3/3 scenes passed
 
 Output:
-  MP4: .manimate/output/animation.mp4 (1.2MB)
-  GIF: .manimate/output/animation.gif (3.4MB)
-  Layout previews: .manimate/lastframes/
+  MP4: $WORK_DIR/output/animation.mp4 (1.2MB)
+  GIF: $WORK_DIR/output/animation.gif (3.4MB)
+  Layout previews: $WORK_DIR/lastframes/
 ```
 
 ---
