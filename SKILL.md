@@ -118,11 +118,9 @@ mkdir -p .manimate/scenes .manimate/assets .manimate/lastframes .manimate/output
 
 Break the prompt into scenes. Each scene specifies visual elements, animations, and narrative arc.
 
-Think about what real-world concepts in the prompt can be represented as **custom SVG icons** vs basic Manim shapes. Apply this rule of thumb: **if a human would draw a recognizable icon for the concept, specify an SVG — if it's abstract or structural, use native shapes.**
+**Default to SVG icons for every real-world concept.** For each scene, identify concepts that can be icons and add them to `asset_manifest`. Every video should have at least 2 SVG assets — if the manifest is empty, revisit the decomposition.
 
-Prefer custom SVG icons for: servers, databases, users/people, documents, locks/keys, shields, clouds, devices (phones, laptops), brains/AI, gears, rockets, envelopes, globes, checkmarks, warnings, error/denied symbols.
-
-Use basic Manim shapes only for: array cells, flowchart boxes, graphs/axes, code blocks, bullets/dots, containers, math expressions.
+Use basic Manim shapes **only** for: array cells, flowchart boxes, graphs/axes, code blocks, containers, math expressions. **Everything else gets an SVG.**
 
 Write `.manimate/story.json` with a top-level `asset_manifest` and per-scene `svg_assets` referencing manifest keys:
 
@@ -189,6 +187,8 @@ Write `.manimate/story.json` with a top-level `asset_manifest` and per-scene `sv
 - `used_in` — list of scene IDs that use this asset
 
 **Per-scene `svg_assets`** is a list of asset IDs from the manifest (not freeform hints). If a scene needs no SVG assets, use an empty list `[]`.
+
+**Asset density target**: Aim for 1-2 SVG assets per scene, 3-6 per video. Scenes with SVG icons are dramatically more engaging than scenes with only basic shapes.
 
 **If no scenes need SVG assets** (e.g., a pure math derivation), set `asset_manifest` to `{}` and all `svg_assets` to `[]`. Steps 6-7 will no-op.
 
@@ -393,13 +393,24 @@ def progress_bar(width=8, height=0.4, fill_color=None):
 
 
 def set_progress(bar, pct):
-    """Return .animate for bar fill to reach pct (0.0-1.0). Fill stays inside track."""
+    """Return animation for bar fill to reach pct (0.0-1.0).
+    Rebuilds the fill shape each frame to avoid .animate vertex interpolation artifacts."""
     track, fill = bar[0], bar[1]
     pad = track.height * 0.12
+    start_w = fill.width
     target_w = max(pad, (track.width - 2 * pad) * max(0.0, min(1.0, pct)))
-    return fill.animate.stretch_to_fit_width(target_w).align_to(
-        track, LEFT
-    ).shift(RIGHT * pad)
+    cr = max(0.05, (track.height - 2 * pad) / 2)
+    fc = fill.get_fill_color()
+
+    def _update(mob, alpha):
+        w = interpolate(start_w, target_w, alpha)
+        mob.become(RoundedRectangle(
+            corner_radius=cr, width=w, height=track.height - 2 * pad,
+            fill_color=fc, fill_opacity=1, stroke_width=0,
+        ))
+        mob.move_to([track.get_left()[0] + pad + w / 2, track.get_center()[1], 0])
+
+    return UpdateFromAlphaFunc(fill, _update)
 
 
 def make_cell(value, color=None, w=0.7, h=0.7):
@@ -446,7 +457,7 @@ This works because render runs from `.manimate/` as CWD (`cd .manimate && manim 
 
 For each entry in `asset_manifest` from story.json, generate a validated SVG file.
 
-**If `asset_manifest` is empty `{}`**, skip this step and Step 7 entirely.
+**If `asset_manifest` is empty `{}`**, pause — are there real-world concepts that could use icons? Only skip for purely mathematical/abstract videos. Otherwise revisit Step 3.
 
 **For each asset in the manifest:**
 
@@ -772,4 +783,4 @@ Read these library files before writing each scene (see Step 8 for which files a
 9. **Render timeout** — 180s timeout on render commands to catch hangs.
 10. **Error recovery** — on render failure, read the error, fix the scene file, and retry. Max 3 attempts per scene.
 11. **Selective library reads** — only read library docs relevant to the scene type to stay focused.
-12. **SVG-forward visuals** — for real-world concepts (servers, users, databases, etc.), generate custom SVG icons validated before use. This is manimate's key visual differentiator.
+12. **SVG-first visuals** — every video defaults to custom SVG icons for real-world concepts. Aim for 3-6 assets per video. A video with zero SVG assets should be the exception (pure math only), not the norm.

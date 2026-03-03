@@ -111,6 +111,49 @@ self.remove(flash)
 
 ---
 
+## SVG Icon Style Rules
+
+SVG icons are manimate's visual differentiator. When a scene represents real-world concepts, use custom SVGs instead of basic shapes.
+
+### Color Mapping
+SVG fills and strokes must use the Creative Chaos palette hex values — never raw Manim color names:
+
+| Palette Token | Hex Value | SVG Usage |
+|---------------|-----------|-----------|
+| PRIMARY | `#ff3366` | Main icon fills — servers, users, documents |
+| ACCENT | `#33ccff` | Secondary icons, cool elements — shields, data |
+| HIGHLIGHT | `#ffcc00` | Focus icons — keys, locks, warnings |
+| SUCCESS | `#66ff66` | Success icons — checkmarks, shields |
+| NEGATIVE | `#ff4444` | Error/denied icons |
+| SURFACE | `#3a3a4a` | Dark inner fills — screen areas, keyholes |
+| BG | `#2a2a3a` | Cut-out shapes, inner details |
+| `#ffffff` | White | Outlines (stroke), inner details |
+
+### Stroke Consistency
+- Outer strokes: `stroke="#ffffff" stroke-width="2"` — matches the clean manimate look
+- Detail strokes: `stroke-width="1.5"` for inner lines
+- Line endings: `stroke-linecap="round" stroke-linejoin="round"` for smooth joints
+
+### ViewBox Conventions
+- Tall icons (person, server, document): `viewBox="0 0 80 100"`
+- Square icons (checkmark, gear, warning): `viewBox="0 0 64 64"`
+- Wide icons (key, token, laptop): `viewBox="0 0 100 60"` or similar
+- Always center the content within the viewBox
+
+### Sizing
+- Main concept icons: `scale=0.8` to `scale=1.0`
+- Small traveling objects (tokens, keys in data flow): `scale=0.3` to `scale=0.5`
+- Large hero icons (single concept on screen): `scale=1.2` to `scale=1.5`
+
+### Flat Design Only
+- NO gradients — renders as black
+- NO filters / blur — ignored by Manim
+- NO text in SVG — use Manim `Text()` placed next to the icon
+- NO dashed strokes — renders as solid
+- Use `opacity` attribute for subtle layering (e.g., `opacity="0.5"` on background elements)
+
+---
+
 ## Typography
 
 ### Fonts
@@ -510,16 +553,27 @@ def progress_bar(width=8, height=0.4, fill_color=None):
 
 
 def set_progress(bar, pct):
-    """Return .animate for bar fill to reach pct (0.0-1.0). Fill stays inside track."""
+    """Return animation for bar fill to reach pct (0.0-1.0).
+    Rebuilds the fill shape each frame to avoid .animate vertex interpolation artifacts."""
     track, fill = bar[0], bar[1]
     pad = track.height * 0.12
+    start_w = fill.width
     target_w = max(pad, (track.width - 2 * pad) * max(0.0, min(1.0, pct)))
-    return fill.animate.stretch_to_fit_width(target_w).align_to(
-        track, LEFT
-    ).shift(RIGHT * pad)
+    cr = max(0.05, (track.height - 2 * pad) / 2)
+    fc = fill.get_fill_color()
+
+    def _update(mob, alpha):
+        w = interpolate(start_w, target_w, alpha)
+        mob.become(RoundedRectangle(
+            corner_radius=cr, width=w, height=track.height - 2 * pad,
+            fill_color=fc, fill_opacity=1, stroke_width=0,
+        ))
+        mob.move_to([track.get_left()[0] + pad + w / 2, track.get_center()[1], 0])
+
+    return UpdateFromAlphaFunc(fill, _update)
 ```
 
-Usage: `self.play(set_progress(bar, 0.75), run_time=1.0)` — fill always stays inside the track because `set_progress()` re-aligns after every stretch.
+Usage: `self.play(set_progress(bar, 0.75), run_time=1.0)` — fill always stays inside the track because `set_progress()` computes the exact target position.
 
 **NEVER** animate a raw Rectangle's width for progress — it will overflow the track. Always use `progress_bar()` + `set_progress()`.
 
@@ -782,49 +836,6 @@ class EquationExample(Scene):
             run_time=0.4,
         )
 ```
-
----
-
-## SVG Icon Style Rules
-
-SVG icons are manimate's visual differentiator. When a scene represents real-world concepts, use custom SVGs instead of basic shapes.
-
-### Color Mapping
-SVG fills and strokes must use the Creative Chaos palette hex values — never raw Manim color names:
-
-| Palette Token | Hex Value | SVG Usage |
-|---------------|-----------|-----------|
-| PRIMARY | `#ff3366` | Main icon fills — servers, users, documents |
-| ACCENT | `#33ccff` | Secondary icons, cool elements — shields, data |
-| HIGHLIGHT | `#ffcc00` | Focus icons — keys, locks, warnings |
-| SUCCESS | `#66ff66` | Success icons — checkmarks, shields |
-| NEGATIVE | `#ff4444` | Error/denied icons |
-| SURFACE | `#3a3a4a` | Dark inner fills — screen areas, keyholes |
-| BG | `#2a2a3a` | Cut-out shapes, inner details |
-| `#ffffff` | White | Outlines (stroke), inner details |
-
-### Stroke Consistency
-- Outer strokes: `stroke="#ffffff" stroke-width="2"` — matches the clean manimate look
-- Detail strokes: `stroke-width="1.5"` for inner lines
-- Line endings: `stroke-linecap="round" stroke-linejoin="round"` for smooth joints
-
-### ViewBox Conventions
-- Tall icons (person, server, document): `viewBox="0 0 80 100"`
-- Square icons (checkmark, gear, warning): `viewBox="0 0 64 64"`
-- Wide icons (key, token, laptop): `viewBox="0 0 100 60"` or similar
-- Always center the content within the viewBox
-
-### Sizing
-- Main concept icons: `scale=0.8` to `scale=1.0`
-- Small traveling objects (tokens, keys in data flow): `scale=0.3` to `scale=0.5`
-- Large hero icons (single concept on screen): `scale=1.2` to `scale=1.5`
-
-### Flat Design Only
-- NO gradients — renders as black
-- NO filters / blur — ignored by Manim
-- NO text in SVG — use Manim `Text()` placed next to the icon
-- NO dashed strokes — renders as solid
-- Use `opacity` attribute for subtle layering (e.g., `opacity="0.5"` on background elements)
 
 ---
 
