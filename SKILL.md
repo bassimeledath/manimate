@@ -30,6 +30,7 @@ Parse the user's prompt and infer rendering parameters:
 | `scenes` | 1-6 | 2 | Count distinct concepts/steps/phases in the prompt |
 | `quality` | l/m/h | h | Default high; use medium for quick drafts |
 | `format` | gif/mp4/both | mp4 | Default mp4; use gif or both only if user explicitly requests GIF |
+| `aspect` | landscape/vertical | landscape | `vertical` (9:16) if the prompt mentions Shorts, Reels, TikTok, vertical, portrait, mobile, or 9:16 |
 | `style` | educational/minimal/cinematic | educational | Infer from the tone/subject |
 | `duration_per_scene` | 5-15s | 8 | Longer for complex concepts, shorter for simple transitions |
 
@@ -41,6 +42,7 @@ Write to `$WORK_DIR/params.json`:
   "scenes": 3,
   "quality": "h",
   "format": "mp4",
+  "aspect": "landscape",
   "style": "educational",
   "duration_per_scene": 8
 }
@@ -60,6 +62,26 @@ media_dir = media
 video_dir = {media_dir}/videos
 images_dir = {media_dir}/images
 ```
+
+**If `aspect` is `vertical`**, add these lines to the `[CLI]` section:
+
+```ini
+frame_width = 8.0
+frame_height = 14.222222
+```
+
+This rotates the standard 14.2 × 8 frame, so pixel density (135 px per unit at 1080p) and font sizes are identical in both aspects.
+
+Set the render resolution flags used by every render command in Steps 7, 9, and 10:
+
+| `aspect` | `quality` | `PREVIEW_RES` (with `-ql`) | `FULL_RES` |
+|----------|-----------|----------------------------|------------|
+| landscape | h | `-r 854,480` | `-r 1920,1080` |
+| landscape | m | `-r 854,480` | `-r 1280,720` |
+| vertical | h | `-r 480,854` | `-r 1080,1920` |
+| vertical | m | `-r 480,854` | `-r 720,1280` |
+
+> **Why `-r` is required**: Manim's `-ql`/`-qh` flags reset the pixel resolution to 16:9 but keep `frame_width`/`frame_height` from `manim.cfg`. Without an explicit `-r`, a vertical frame gets rendered into a 1920×1080 video and everything is distorted.
 
 > **Why `renderer = cairo`**: Cairo is the safe default for headless/CI environments. It requires no GPU, no display server, and no OpenGL context.
 
@@ -288,6 +310,19 @@ NEGATIVE  = "#ff4444"
 TEXT_CLR  = "#ffffff"
 TEXT_DIM  = "#8a8aaa"
 
+# ── Frame & safe area (works for landscape 16:9 and vertical 9:16) ──
+VERTICAL = config.frame_height > config.frame_width
+FRAME_W, FRAME_H = config.frame_width, config.frame_height
+if VERTICAL:
+    # Shorts/Reels/TikTok overlay captions at the bottom and buttons on the right
+    SAFE_LEFT, SAFE_RIGHT = -FRAME_W / 2 + 0.5, FRAME_W / 2 - 0.9
+    SAFE_TOP, SAFE_BOTTOM = FRAME_H / 2 - 0.8, -FRAME_H / 2 + 2.6
+else:
+    SAFE_LEFT, SAFE_RIGHT = -FRAME_W / 2 + 0.8, FRAME_W / 2 - 0.8
+    SAFE_TOP, SAFE_BOTTOM = FRAME_H / 2 - 0.8, -FRAME_H / 2 + 0.8
+SAFE_W, SAFE_H = SAFE_RIGHT - SAFE_LEFT, SAFE_TOP - SAFE_BOTTOM
+SAFE_CENTER = np.array([(SAFE_LEFT + SAFE_RIGHT) / 2, (SAFE_TOP + SAFE_BOTTOM) / 2, 0])
+
 # ── Asset directory ──
 ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
@@ -316,10 +351,11 @@ def tw(text_str):
 
 
 def dot_grid():
-    """Create the signature Creative Chaos dot grid background."""
+    """Create the signature Creative Chaos dot grid background. Sized to the frame."""
+    hx, hy = int(config.frame_width / 2), int(config.frame_height / 2)
     return VGroup(*[
         Dot([x, y, 0], radius=0.02, fill_opacity=0.08, color=TEXT_CLR)
-        for x in range(-7, 8) for y in range(-4, 5)
+        for x in range(-hx, hx + 1) for y in range(-hy, hy + 1)
     ])
 
 
@@ -340,6 +376,8 @@ def title_card(scene, text, wait=2.0):
         title Mobject (now in the UL corner at scale 0.55)
     """
     title = Text(text, font="Helvetica Neue", font_size=44, color=TEXT_CLR, weight=BOLD)
+    if title.width > SAFE_W:
+        title.scale_to_fit_width(SAFE_W)
     underline = Line(
         title.get_left() + DOWN * 0.35,
         title.get_right() + DOWN * 0.35,
@@ -532,7 +570,7 @@ class AssetValidation(Scene):
 3. Render the validation scene as a still frame:
 
 ```bash
-cd "$WORK_DIR" && manim render -ql -s --renderer=cairo --disable_caching \
+cd "$WORK_DIR" && manim render -ql $PREVIEW_RES -s --renderer=cairo --disable_caching \
   scenes/_asset_validation.py AssetValidation 2>/dev/null
 ```
 
@@ -612,6 +650,13 @@ Generate each scene file. Scenes import from `shared.py` and load assets via `lo
    26. **Contained text**: when placing text inside a container, ALWAYS measure text width first and size the container to fit: `max(desired_w, text.width + 0.6)`. Or use `make_node()` which auto-sizes. NEVER hard-code a container width without checking the text.
    27. **Progress bars**: use `progress_bar()` and `set_progress()` from shared.py. NEVER animate a raw Rectangle's width for progress — it will overflow the track.
 
+   **Vertical Layout Rules (only when `aspect` is `vertical` — see "Vertical (9:16) Layout" in `library/style-guide.md`):**
+
+   28. The frame is 8 wide × 14.2 tall. Stack content with `arrange(DOWN)` — never place more than two small items side by side
+   29. Keep content inside the vertical safe area: `SAFE_LEFT`/`SAFE_RIGHT`/`SAFE_TOP`/`SAFE_BOTTOM` from shared.py. The bottom band and right edge are covered by platform UI (captions, buttons) on Shorts/Reels/TikTok
+   30. Rows of data (arrays, bars) must fit within `SAFE_RIGHT - SAFE_LEFT` — shrink cell size rather than letting a row overflow
+   31. Never move the title to a side corner (`to_corner(UL)` already respects the safe area via `title_card()`); never put content beside the title
+
 **Expected scene size**: 80-130 lines (vs 180-230 with inlined constants).
 
 5. **Validate the generated file:**
@@ -648,7 +693,7 @@ After writing each scene, validate the layout visually. Scenes end with `FadeOut
 1. **Render a low-quality video** (fast: ~5-10s at 480p 15fps):
 
 ```bash
-cd "$WORK_DIR" && manim render -ql --renderer=cairo --disable_caching \
+cd "$WORK_DIR" && manim render -ql $PREVIEW_RES --renderer=cairo --disable_caching \
   scenes/scene_$(printf "%02d" $N).py $SCENE_CLASS 2>/dev/null
 ```
 
@@ -670,8 +715,9 @@ ffmpeg -i "$VIDEO_PATH" \
 | No overlaps | All elements visible, no unintended overlap |
 | Asset rendering | SVG icons recognizable and properly colored |
 | Safe margins | Nothing within 0.8 units of frame edge |
+| Vertical safe area (vertical only) | Key content stays out of the bottom and right UI overlay bands |
 
-4. **If any check fails**: fix the scene positioning code, re-render at `-ql`, re-inspect (max 2 retries per scene)
+4. **If any check fails**: fix the scene positioning code, re-render at `-ql $PREVIEW_RES`, re-inspect (max 2 retries per scene)
 
 > **Cost**: ~5-10s per scene for a `-ql` render vs 60-180s for a wasted full render. This catches layout issues early.
 
@@ -691,7 +737,7 @@ SCENE_CLASS="<scene_class from story.json>"
 
 RENDER_LOG=$(mktemp)
 RENDER_CMD="manim render scenes/${SCENE_FILE}.py $SCENE_CLASS \
-    --renderer=cairo -qh --format=mp4 --disable_caching"
+    --renderer=cairo -qh $FULL_RES --format=mp4 --disable_caching"
 
 if [ -n "$TIMEOUT_CMD" ]; then
   RENDER_CMD="$TIMEOUT_CMD 180 $RENDER_CMD"
@@ -705,11 +751,9 @@ cd ..
 **On success**: locate the output MP4:
 
 ```bash
-QUALITY_SUBDIR="1080p60"  # matches -qh
+# Manim names the dir {pixel_height}p{fps}: 1080p60 (landscape -qh), 1920p60 (vertical -qh)
+QUALITY_SUBDIR="$(echo "$FULL_RES" | sed -E 's/.*,([0-9]+)/\1/')p60"
 EXPECTED_PATH="$WORK_DIR/media/videos/${SCENE_FILE}/${QUALITY_SUBDIR}/${SCENE_CLASS}.mp4"
-if [ ! -f "$EXPECTED_PATH" ]; then
-  FOUND_PATH=$(find "$WORK_DIR"/media/videos -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
-fi
 ```
 
 **On failure (up to 3 retries):**
@@ -748,6 +792,7 @@ Prompt: "explain how binary search works"
 Scenes: 3 (all rendered successfully)
 Duration: 28s (8s + 12s + 8s)
 Quality: 1080p @ 60fps
+Aspect: landscape (1920×1080)  # or: vertical (1080×1920)
 Renderer: cairo
 
 Assets: 2 SVGs generated and validated (magnifier_icon, checkmark_icon)
@@ -778,7 +823,7 @@ Read these library files before writing each scene (see Step 8 for which files a
 1. **ManimCE only** — `from manim import *` (never `manimlib`). Cairo renderer for headless safety.
 2. **One Scene class per file** — each scene is a separate `.py` file for isolated error recovery.
 3. **Inline generation** — the orchestrating agent writes scene files directly (no sub-processes), ensuring the user's chosen model is used throughout.
-4. **Shared preamble** — `shared.py` contains palette constants, helpers (`setup_scene`, `title_card`, `dot_grid`, `tw`, `make_node`, `progress_bar`, `set_progress`), and asset loading (`load_asset`). Scenes import, not copy.
+4. **Shared preamble** — `shared.py` contains palette constants, frame/safe-area constants (`VERTICAL`, `SAFE_*`), helpers (`setup_scene`, `title_card`, `dot_grid`, `tw`, `make_node`, `progress_bar`, `set_progress`), and asset loading (`load_asset`). Scenes import, not copy.
 5. **Asset-first** — SVG icons are generated and validated in Steps 6-7 before scene code is written. Scenes load validated assets via `load_asset()`, not inline SVG strings.
 6. **Two validation gates** — asset grid (Step 7) and layout frame (Step 9) catch visual issues before the expensive full render in Step 10.
 7. **Import from shared.py** — scenes use `from shared import *` for palette, helpers, and asset loading. No inlined constants.

@@ -275,7 +275,7 @@ class MyScene(Scene):
 | xl | 1.2 | Section breaks |
 
 ### Safe Area
-- Frame: ~14.2 x 8 units
+- Frame: ~14.2 x 8 units (landscape; see "Vertical (9:16) Layout" below for Shorts)
 - **Minimum edge margin**: 0.8 units on all sides
 - **Content area**: ~12.6 x 6.4 units
 - Never place content within 0.8 units of the frame edge
@@ -287,6 +287,32 @@ class MyScene(Scene):
 - **Side-by-side**: `shift(2.5 * LEFT)` and `shift(2.5 * RIGHT)` — wider than default
 - **Labels**: `next_to(referent, DOWN, buff=0.3)` — below, not beside
 - **Section tag**: small PRIMARY-colored text at `UL` above the title — `font_size=16, weight=BOLD`
+
+### Vertical (9:16) Layout
+
+Used when `aspect` is `vertical` (YouTube Shorts, Reels, TikTok). The frame is rotated: **8 wide × 14.2 tall**. Pixel density matches landscape, so the font size scale is unchanged.
+
+**Safe area** — platform UI covers the bottom (captions, channel name) and the right edge (like/comment buttons). Use the constants from shared.py instead of hardcoding:
+
+| Constant | Vertical | Landscape |
+|----------|----------|-----------|
+| `SAFE_LEFT` / `SAFE_RIGHT` | −3.5 / 3.1 | −6.3 / 6.3 |
+| `SAFE_TOP` / `SAFE_BOTTOM` | 6.3 / −4.5 | 3.2 / −3.2 |
+| `SAFE_W` × `SAFE_H` | 6.6 × 10.8 | 12.6 × 6.4 |
+
+**Positioning**:
+- **Stack, don't spread**: build the scene as a vertical column — title, then the visual, then readouts/annotations below it, all via `arrange(DOWN)`
+- **Main visual**: center on `SAFE_CENTER`, not `ORIGIN` (the safe area sits above the frame center)
+- **Rows of data**: size cells so the row fits `SAFE_W` — e.g. `cell_w = min(0.7, SAFE_W / n - buff)`
+- **Side-by-side**: at most two small items (badges, nodes). Larger comparisons become top/bottom
+- **Text**: wrap long lines into multiple `Text` objects stacked with `arrange(DOWN, aligned_edge=LEFT)` — a 26pt line holds ~30 characters
+
+```python
+# Vertical column: visual on top, readouts underneath
+cells = make_array(values, cell_w=min(0.7, SAFE_W / len(values) - 0.05))
+readout = VGroup(area_t, best_t).arrange(DOWN, buff=0.3, aligned_edge=LEFT)
+VGroup(cells, readout).arrange(DOWN, buff=0.8).move_to(SAFE_CENTER)
+```
 
 ### Layout Best Practices — Preventing Overlaps
 
