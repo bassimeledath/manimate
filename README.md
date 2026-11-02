@@ -31,9 +31,10 @@ git clone https://github.com/bassimeledath/manimate ~/.codex/skills/manimate
 /manimate "show the Pythagorean theorem"
 /manimate "explain how binary search works"
 /manimate "visualize bubble sort step by step"
+/manimate "two pointers on Container With Most Water as a YouTube Short"
 ```
 
-Outputs to `.manimate/output/animation.mp4` (GIF available on request).
+Outputs to `.manimate/output/animation.mp4` (GIF available on request). Mention Shorts, Reels, TikTok, or vertical to get a 1080×1920 video.
 
 ## Dependencies
 
