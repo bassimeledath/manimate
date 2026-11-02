@@ -60,8 +60,11 @@ story = json.load(open('$STORY_FILE'))
 print(story['scenes'][$((N-1))]['scene_class'])
   ")
 
-  # Search for the rendered video (quality dir varies by -q flag)
-  VIDEO=$(find "$MEDIA_DIR/videos" -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
+  # Search for the rendered video (quality dir varies by -q flag, e.g. 480p15, 1080p60).
+  # The layout preview leaves a low-res copy too — pick the highest resolution, then fps.
+  VIDEO=$(find "$MEDIA_DIR/videos" -name "${SCENE_CLASS}.mp4" 2>/dev/null \
+    | awk -F/ '{ split($(NF-1), q, "p"); print q[1] + 0, q[2] + 0, $0 }' \
+    | sort -k1,1nr -k2,2nr | head -1 | cut -d' ' -f3-)
 
   if [ -z "$VIDEO" ] || [ ! -f "$VIDEO" ]; then
     echo "Error: could not find rendered video for scene $N ($SCENE_CLASS)"
