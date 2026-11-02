@@ -641,7 +641,7 @@ If validation fails (syntax error or wrong class name), fix the file immediately
 
 ### Step 9: Layout Validation Gate
 
-After writing each scene, validate the layout visually. Scenes end with `FadeOut(*self.mobjects)` which makes the last frame blank — so we extract a mid-animation frame instead.
+After writing each scene, validate the layout visually. `title_card()` shows the title alone for the first ~3 seconds and scenes end with a `FadeOut` of everything, so neither the first nor the last frame shows the content — we sample three frames across the body of the scene instead.
 
 **For each scene N:**
 
@@ -652,17 +652,24 @@ cd "$WORK_DIR" && manim render -ql --renderer=cairo --disable_caching \
   scenes/scene_$(printf "%02d" $N).py $SCENE_CLASS 2>/dev/null
 ```
 
-2. **Extract a frame at ~2 seconds** (frame 30 at 15fps) — content should be visible before exit animations:
+2. **Extract frames at 45%, 70%, and 90% of the scene** and tile them side by side — after the title card, before the exit animation:
 
 ```bash
 SCENE_FILE="scene_$(printf "%02d" $N)"
 VIDEO_PATH=$(find "$WORK_DIR"/media/videos/${SCENE_FILE} -name "${SCENE_CLASS}.mp4" 2>/dev/null | head -1)
-ffmpeg -i "$VIDEO_PATH" \
-  -vf "select=eq(n\,30)" -vframes 1 -y \
+DURATION=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$VIDEO_PATH")
+for PCT in 45 70 90; do
+  ffmpeg -ss "$(python3 -c "print($DURATION * $PCT / 100)")" -i "$VIDEO_PATH" \
+    -vframes 1 -y "$WORK_DIR"/lastframes/${SCENE_FILE}_${PCT}.png 2>/dev/null
+done
+ffmpeg -i "$WORK_DIR"/lastframes/${SCENE_FILE}_45.png \
+  -i "$WORK_DIR"/lastframes/${SCENE_FILE}_70.png \
+  -i "$WORK_DIR"/lastframes/${SCENE_FILE}_90.png \
+  -filter_complex hstack=inputs=3 -y \
   "$WORK_DIR"/lastframes/${SCENE_FILE}_layout.png 2>/dev/null
 ```
 
-3. **Read the extracted PNG** and evaluate against this rubric:
+3. **Read the tiled PNG** (three frames, left to right in time) and evaluate every frame against this rubric:
 
 | Check | Pass condition |
 |-------|---------------|
